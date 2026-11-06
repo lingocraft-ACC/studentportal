@@ -1,0 +1,278 @@
+﻿<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Assigned Levels — Lingo Student Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <link rel="stylesheet" href="assets/css/student.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body>
+  <!-- Student Navbar -->
+  <header class="student-navbar">
+    <div class="student-navbar-inner">
+      <a href="dashboard.html" class="student-brand">
+        <div class="student-brand-logo"><i class="fa-solid fa-graduation-cap"></i></div>
+        <span>Lingo Student</span>
+      </a>
+
+      <nav class="student-nav-links">
+        <a href="dashboard.html" class="student-nav-link"><i class="fa-solid fa-house"></i> <span data-i18n="Dashboard">Dashboard</span></a>
+        <a href="levels.html" class="student-nav-link active"><i class="fa-solid fa-layer-group"></i> <span data-i18n="My Levels">My Levels</span></a>
+        <a href="lessons.html" class="student-nav-link"><i class="fa-solid fa-book-open"></i> <span data-i18n="Lessons">Lessons</span></a>
+        <a href="exams.html" class="student-nav-link"><i class="fa-solid fa-file-signature"></i> <span data-i18n="Exams">Exams</span></a>
+        <a href="tasks.html" class="student-nav-link"><i class="fa-solid fa-list-check"></i> <span data-i18n="Tasks">Tasks</span></a>
+        <a href="profile.html" class="student-nav-link"><i class="fa-solid fa-chart-pie"></i> <span data-i18n="My Profile">My Progress</span></a>
+      </nav>
+
+      <div class="d-flex align-center gap-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-action="toggle-lang">
+          <i class="fa-solid fa-language"></i> <span data-lang-toggleLabel>عربي</span>
+        </button>
+        <div class="avatar avatar-sm" data-student-avatar>ST</div>
+        <button type="button" class="btn btn-outline-danger btn-sm" data-action="logout">
+          <i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="Logout">Logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="student-container">
+    <div class="d-flex justify-between align-center flex-wrap gap-3 mb-4">
+      <div>
+        <h1 style="font-size:1.5rem;" data-i18n="My Levels">My Assigned Educational Levels</h1>
+        <p class="text-muted text-sm">Select any assigned level to access its lessons, examinations, and coursework tasks.</p>
+      </div>
+    </div>
+
+    <!-- Assigned Levels Grid (Section 11.2) -->
+    <div id="student-levels-mount" class="student-levels-grid mb-6">
+      <div class="card" style="grid-column:1/-1;">
+        <div class="loading-state">
+          <span class="spinner"></span>
+          <p class="mt-2">Loading your assigned levels...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Selected Level Details Panel (Section 11.3) -->
+    <div id="level-details-section" class="d-none">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title" id="selected-level-heading"><i class="fa-solid fa-folder-open text-primary"></i> Level Details</h2>
+          <span class="badge badge-primary" id="selected-level-completion-badge">0% Completed</span>
+        </div>
+        <div class="card-body" id="selected-level-body"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/helpers.js"></script>
+  <script>
+    (async function() {
+      const session = await window.Auth.requireStudent();
+      if (!session) return;
+
+      const esc = window.Helpers.escapeHtml;
+      const mountEl = document.getElementById('student-levels-mount');
+      const detailsSec = document.getElementById('level-details-section');
+      const detailsBody = document.getElementById('selected-level-body');
+
+      const queryLevelId = window.Helpers.getQueryParam('levelId') || '';
+
+      async function loadMyLevels() {
+        try {
+          const levels = await window.API.getLevels({}, { skipCache: true });
+
+          if (!levels || levels.length === 0) {
+            mountEl.innerHTML = `
+              <div class="card" style="grid-column: 1 / -1;">
+                <div class="empty-state">
+                  <div class="empty-state-icon"><i class="fa-solid fa-layer-group"></i></div>
+                  <h3>No Educational Levels Assigned</h3>
+                  <p>Your account does not currently have any active levels assigned. Please contact your administrator.</p>
+                </div>
+              </div>
+            `;
+            return;
+          }
+
+          mountEl.innerHTML = levels.map(function(lvl) {
+            const pct = Number(lvl.Completion_Percentage || 0);
+            const isImg = String(lvl.Image_URL || '').indexOf('http') === 0;
+            const iconHtml = isImg
+              ? `<img src="${esc(lvl.Image_URL)}" alt="${esc(lvl.Level_Name)}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;">`
+              : `<div class="avatar" style="background:rgba(255,255,255,0.2);"><i class="fa-solid ${esc(lvl.Image_URL || 'fa-layer-group')}"></i></div>`;
+
+            return `
+              <div class="student-level-card">
+                <div class="student-level-cover" style="--level-color:${esc(lvl.Color || '#4f46e5')};">
+                  <div>
+                    <span class="text-xs" style="opacity:0.85;">${esc(lvl.Level_ID)}</span>
+                    <h3 style="color:#fff;font-size:1.25rem;">${esc(lvl.Level_Name)}</h3>
+                  </div>
+                  ${iconHtml}
+                </div>
+                <div class="student-level-body">
+                  <p class="text-sm text-secondary mb-3">${esc(lvl.Description || 'Complete all lessons, tasks, and exams in this level.')}</p>
+
+                  <div class="d-flex justify-between text-xs font-bold mb-1">
+                    <span>Current Progress</span>
+                    <span>${pct}%</span>
+                  </div>
+                  <div class="progress-bar-wrap mb-3">
+                    <div class="progress-bar-fill" style="width:${pct}%;"></div>
+                  </div>
+
+                  <div class="level-stats-grid mb-4" style="padding-top:0;">
+                    <div class="level-stat-pill">
+                      <i class="fa-solid fa-book-open"></i>
+                      <div><span>Lessons</span><strong>${lvl.Completed_Lessons || 0} / ${lvl.Lessons_Count || 0}</strong></div>
+                    </div>
+                    <div class="level-stat-pill">
+                      <i class="fa-solid fa-file-signature"></i>
+                      <div><span>Exams</span><strong>${lvl.Completed_Exams || 0} / ${lvl.Exams_Count || 0}</strong></div>
+                    </div>
+                    <div class="level-stat-pill">
+                      <i class="fa-solid fa-list-check"></i>
+                      <div><span>Tasks</span><strong>${lvl.Completed_Tasks || 0} / ${lvl.Tasks_Count || 0}</strong></div>
+                    </div>
+                    <div class="level-stat-pill">
+                      <i class="fa-solid fa-chart-pie"></i>
+                      <div><span>Completion</span><strong>${pct}%</strong></div>
+                    </div>
+                  </div>
+
+                  <div class="d-flex gap-2 mt-auto">
+                    <button type="button" class="btn btn-primary btn-sm w-100" data-open-level="${esc(lvl.Level_ID)}">
+                      <i class="fa-solid fa-folder-open"></i> View Level Details
+                    </button>
+                    <a href="lessons.html?levelId=${encodeURIComponent(lvl.Level_ID)}" class="btn btn-secondary btn-sm">
+                      <i class="fa-solid fa-book-open"></i> Lessons
+                    </a>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          mountEl.querySelectorAll('[data-open-level]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+              openLevelDetails(btn.getAttribute('data-open-level'));
+            });
+          });
+
+          if (queryLevelId) {
+            await openLevelDetails(queryLevelId);
+          } else if (levels.length > 0) {
+            await openLevelDetails(levels[0].Level_ID);
+          }
+        } catch (err) {
+          mountEl.innerHTML = `<div class="card" style="grid-column:1/-1;"><div class="empty-state"><p class="text-danger">${esc(err.message)}</p></div></div>`;
+        }
+      }
+
+      async function openLevelDetails(levelId) {
+        if (!window.Auth.canStudentAccessLevel(levelId)) {
+          window.Helpers.showToast('Access Denied: You are not assigned to this educational level.', 'error');
+          return;
+        }
+        detailsSec.classList.remove('d-none');
+        detailsBody.innerHTML = `<div class="loading-state"><span class="spinner"></span><p class="mt-2">Loading level contents...</p></div>`;
+
+        try {
+          const data = await window.API.getLevelDetails({ levelId: levelId });
+          const lvl = data.level || {};
+          const lessons = data.lessons || [];
+          const exams = data.exams || [];
+          const tasks = data.tasks || [];
+
+          document.getElementById('selected-level-heading').innerHTML = `<i class="fa-solid fa-layer-group text-primary"></i> ${esc(lvl.Level_Name)} — Curriculum &amp; Assessments`;
+          document.getElementById('selected-level-completion-badge').textContent = (lvl.Completion_Percentage || 0) + '% Completed';
+
+          detailsBody.innerHTML = `
+            <p class="text-secondary mb-4">${esc(lvl.Description || '')}</p>
+
+            <!-- 1. Lessons in this Level -->
+            <h3 style="font-size:1.05rem;margin-bottom:0.75rem;"><i class="fa-solid fa-book-open text-primary"></i> 1. Level Lessons (${lessons.length})</h3>
+            <div class="mb-6">
+              ${lessons.length > 0 ? lessons.map(function(les) {
+                return `
+                  <div class="d-flex justify-between align-center p-3 mb-2" style="padding:0.9rem 1.1rem;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-body);">
+                    <div>
+                      <div class="d-flex align-center gap-2">
+                        <span class="badge badge-secondary">Lesson #${les.Display_Order}</span>
+                        <strong>${esc(les.Lesson_Title)}</strong>
+                        ${les.Is_Completed ? `<span class="badge badge-success"><i class="fa-solid fa-check"></i> Completed</span>` : `<span class="badge badge-warning">Pending</span>`}
+                      </div>
+                      <p class="text-xs text-muted mt-1">${esc(les.Description || '')}</p>
+                    </div>
+                    <a href="lessons.html?levelId=${encodeURIComponent(levelId)}&lessonId=${encodeURIComponent(les.Lesson_ID)}" class="btn btn-primary btn-sm">
+                      <i class="fa-solid fa-book-open-reader"></i> Open Lesson
+                    </a>
+                  </div>
+                `;
+              }).join('') : '<p class="text-muted text-sm">No lessons available in this level yet.</p>'}
+            </div>
+
+            <!-- 2. Available Exams in this Level -->
+            <h3 style="font-size:1.05rem;margin-bottom:0.75rem;"><i class="fa-solid fa-file-signature text-warning"></i> 2. Level Examinations (${exams.length})</h3>
+            <div class="mb-6">
+              ${exams.length > 0 ? exams.map(function(ex) {
+                return `
+                  <div class="d-flex justify-between align-center mb-2" style="padding:0.9rem 1.1rem;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-body);">
+                    <div>
+                      <div class="d-flex align-center gap-2">
+                        <strong>${esc(ex.Exam_Title)}</strong>
+                        ${ex.Best_Percentage !== null ? `<span class="badge badge-info">Best Score: ${ex.Best_Percentage}%</span>` : ''}
+                      </div>
+                      <div class="text-xs text-muted mt-1">
+                        Duration: ${ex.Duration} mins &bull; Total Marks: ${ex.Total_Marks} &bull; Passing: ${ex.Passing_Score}% &bull; Attempts Used: ${ex.Student_Attempts_Count}/${ex.Max_Attempts}
+                      </div>
+                    </div>
+                    <a href="${ex.Can_Start ? 'exam-player.html?examId=' + encodeURIComponent(ex.Exam_ID) : 'exams.html'}" class="btn ${ex.Can_Start ? 'btn-primary' : 'btn-secondary'} btn-sm">
+                      ${ex.Active_Attempt_ID ? 'Resume Exam' : (ex.Can_Start ? 'Start Exam' : 'View Results')}
+                    </a>
+                  </div>
+                `;
+              }).join('') : '<p class="text-muted text-sm">No exams available in this level yet.</p>'}
+            </div>
+
+            <!-- 3. Available Tasks in this Level -->
+            <h3 style="font-size:1.05rem;margin-bottom:0.75rem;"><i class="fa-solid fa-list-check text-success"></i> 3. Level Tasks &amp; Assignments (${tasks.length})</h3>
+            <div>
+              ${tasks.length > 0 ? tasks.map(function(tk) {
+                return `
+                  <div class="d-flex justify-between align-center mb-2" style="padding:0.9rem 1.1rem;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-body);">
+                    <div>
+                      <div class="d-flex align-center gap-2">
+                        <strong>${esc(tk.Task_Title)}</strong>
+                        ${window.Helpers.renderStatusBadge(tk.Student_Status)}
+                      </div>
+                      <div class="text-xs text-muted mt-1">
+                        Max Score: ${tk.Max_Score} ${tk.Deadline ? ' &bull; Deadline: ' + window.Helpers.formatDateTime(tk.Deadline) : ''}
+                      </div>
+                    </div>
+                    <a href="task-player.html?taskId=${encodeURIComponent(tk.Task_ID)}" class="btn btn-secondary btn-sm">
+                      <i class="fa-solid fa-arrow-right"></i> Open Task
+                    </a>
+                  </div>
+                `;
+              }).join('') : '<p class="text-muted text-sm">No tasks available in this level yet.</p>'}
+            </div>
+          `;
+        } catch (err) {
+          detailsBody.innerHTML = `<p class="text-danger">${esc(err.message)}</p>`;
+        }
+      }
+
+      loadMyLevels();
+    })();
+  </script>
+</body>
+</html>

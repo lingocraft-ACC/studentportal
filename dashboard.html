@@ -1,0 +1,302 @@
+﻿<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard — Lingo Learning Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <link rel="stylesheet" href="assets/css/student.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body>
+  <!-- Student Navigation Bar -->
+  <header class="student-navbar">
+    <div class="student-navbar-inner">
+      <a href="dashboard.html" class="student-brand">
+        <div class="student-brand-logo"><i class="fa-solid fa-graduation-cap"></i></div>
+        <span>Lingo Student</span>
+      </a>
+
+      <nav class="student-nav-links">
+        <a href="dashboard.html" class="student-nav-link active"><i class="fa-solid fa-house"></i> <span data-i18n="Dashboard">Dashboard</span></a>
+        <a href="levels.html" class="student-nav-link"><i class="fa-solid fa-layer-group"></i> <span data-i18n="My Levels">My Levels</span></a>
+        <a href="lessons.html" class="student-nav-link"><i class="fa-solid fa-book-open"></i> <span data-i18n="Lessons">Lessons</span></a>
+        <a href="exams.html" class="student-nav-link"><i class="fa-solid fa-file-signature"></i> <span data-i18n="Exams">Exams</span></a>
+        <a href="tasks.html" class="student-nav-link"><i class="fa-solid fa-list-check"></i> <span data-i18n="Tasks">Tasks</span></a>
+        <a href="profile.html" class="student-nav-link"><i class="fa-solid fa-chart-pie"></i> <span data-i18n="My Profile">My Progress</span></a>
+      </nav>
+
+      <div class="d-flex align-center gap-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-action="toggle-lang">
+          <i class="fa-solid fa-language"></i> <span data-lang-toggleLabel>عربي</span>
+        </button>
+        <div class="avatar avatar-sm" data-student-avatar>ST</div>
+        <button type="button" class="btn btn-outline-danger btn-sm" data-action="logout" title="Logout">
+          <i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="Logout">Logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="student-container">
+    <!-- Welcome Banner -->
+    <div class="welcome-banner">
+      <div class="welcome-banner-left">
+        <div class="welcome-avatar" data-student-avatar>ST</div>
+        <div class="welcome-text">
+          <h1>Welcome back, <span data-student-name>Student</span>!</h1>
+          <p>Student Code: <code style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:4px;" data-student-code>—</code> &bull; Track your assigned levels, lessons, tasks, and exams below.</p>
+          <div class="d-flex flex-wrap gap-2 mt-2" id="banner-assigned-levels"></div>
+        </div>
+      </div>
+
+      <div class="welcome-stats-pill">
+        <div class="welcome-stat-item">
+          <span>Overall Score</span>
+          <strong id="hero-overall-pct">0%</strong>
+        </div>
+        <div class="welcome-stat-item">
+          <span>Level Progress</span>
+          <strong id="hero-level-completion">0%</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Metric Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <span class="kpi-label">Completed Lessons</span>
+          <h3 class="kpi-value" id="stu-kpi-lessons">0 / 0</h3>
+          <p class="kpi-sub">Completed / Available Lessons</p>
+        </div>
+        <div class="kpi-icon sky"><i class="fa-solid fa-book-open-reader"></i></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <span class="kpi-label">Available Exams</span>
+          <h3 class="kpi-value" id="stu-kpi-exams">0</h3>
+          <p class="kpi-sub" id="stu-kpi-exams-sub">0 Completed &bull; 0% Avg</p>
+        </div>
+        <div class="kpi-icon indigo"><i class="fa-solid fa-file-signature"></i></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <span class="kpi-label">Completed Tasks</span>
+          <h3 class="kpi-value" id="stu-kpi-tasks-done">0 / 0</h3>
+          <p class="kpi-sub" id="stu-kpi-tasks-sub">0% Task Average</p>
+        </div>
+        <div class="kpi-icon emerald"><i class="fa-solid fa-circle-check"></i></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <span class="kpi-label">Pending Tasks</span>
+          <h3 class="kpi-value" id="stu-kpi-tasks-pending">0</h3>
+          <p class="kpi-sub">Awaiting submission</p>
+        </div>
+        <div class="kpi-icon amber"><i class="fa-solid fa-hourglass-half"></i></div>
+      </div>
+    </div>
+
+    <!-- Assigned Levels Section -->
+    <div class="d-flex justify-between align-center mb-3">
+      <h2 style="font-size:1.25rem;"><i class="fa-solid fa-layer-group text-primary"></i> My Assigned Levels</h2>
+      <a href="levels.html" class="btn btn-secondary btn-sm">View All Levels &rarr;</a>
+    </div>
+    <div id="dashboard-levels-grid" class="student-levels-grid mb-6">
+      <div class="card" style="grid-column:1/-1;"><div class="loading-state"><span class="spinner"></span></div></div>
+    </div>
+
+    <!-- Available Exams, Pending Tasks & Recent Activity -->
+    <div class="charts-grid">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-file-signature text-primary"></i> Available Examinations</h3>
+          <a href="exams.html" class="btn btn-ghost btn-sm">All Exams &rarr;</a>
+        </div>
+        <div class="card-body" id="dashboard-exams-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-list-check text-warning"></i> Pending &amp; Active Tasks</h3>
+          <a href="tasks.html" class="btn btn-ghost btn-sm">All Tasks &rarr;</a>
+        </div>
+        <div class="card-body" id="dashboard-tasks-list"></div>
+      </div>
+    </div>
+
+    <!-- Recent Activity Feed -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-clock-rotate-left text-primary"></i> Recent Learning Activity</h3>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Activity Type</th>
+              <th>Level / Lesson</th>
+              <th>Reference</th>
+              <th>Date &amp; Time</th>
+            </tr>
+          </thead>
+          <tbody id="recent-activity-tbody">
+            <tr><td colspan="4" class="text-center text-muted">Loading recent activity...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/helpers.js"></script>
+  <script>
+    (async function() {
+      const session = await window.Auth.requireStudent();
+      if (!session) return;
+
+      const esc = window.Helpers.escapeHtml;
+
+      async function loadDashboard() {
+        try {
+          const data = await window.API.getStudentDashboardData();
+          const ov = data.overallPerformance || {};
+          const levels = data.assignedLevels || [];
+          const exams = data.availableExams || [];
+          const tasks = data.availableTasks || [];
+          const acts = data.recentActivity || [];
+
+          document.getElementById('hero-overall-pct').textContent = (ov.overallAveragePercentage || 0) + '%';
+          document.getElementById('hero-level-completion').textContent = (ov.levelCompletionPercentage || 0) + '%';
+
+          document.getElementById('stu-kpi-lessons').textContent = (ov.completedLessons || 0) + ' / ' + (ov.availableLessons || 0);
+          document.getElementById('stu-kpi-exams').textContent = ov.availableExams || 0;
+          document.getElementById('stu-kpi-exams-sub').textContent =
+            (ov.completedExams || 0) + ' Completed • ' + (ov.averageExamScore || 0) + '% Avg';
+          document.getElementById('stu-kpi-tasks-done').textContent = (ov.completedTasks || 0) + ' / ' + (ov.availableTasks || 0);
+          document.getElementById('stu-kpi-tasks-sub').textContent = (ov.averageTaskScore || 0) + '% Task Average';
+          document.getElementById('stu-kpi-tasks-pending').textContent = ov.pendingTasks || 0;
+
+          // Banner assigned levels badges
+          document.getElementById('banner-assigned-levels').innerHTML = levels.map(function(l) {
+            return `<span class="badge" style="background:rgba(255,255,255,0.22);color:#fff;"><i class="fa-solid fa-layer-group"></i> ${esc(l.Level_Name)}</span>`;
+          }).join('');
+
+          // Render Assigned Levels Cards
+          const levelsGrid = document.getElementById('dashboard-levels-grid');
+          if (levels.length === 0) {
+            levelsGrid.innerHTML = `<div class="card" style="grid-column:1/-1;"><div class="empty-state"><h3>No Levels Assigned Yet</h3><p>Please contact your administrator to assign educational levels to your account.</p></div></div>`;
+          } else {
+            levelsGrid.innerHTML = levels.map(function(lvl) {
+              const pct = Number(lvl.Completion_Percentage || 0);
+              return `
+                <div class="student-level-card">
+                  <div class="student-level-cover" style="--level-color:${esc(lvl.Color || '#4f46e5')};">
+                    <div>
+                      <span class="text-xs" style="opacity:0.85;">${esc(lvl.Level_ID)}</span>
+                      <h3 style="color:#fff;font-size:1.2rem;">${esc(lvl.Level_Name)}</h3>
+                    </div>
+                    <div class="avatar" style="background:rgba(255,255,255,0.2);"><i class="fa-solid ${esc(lvl.Image_URL || 'fa-layer-group')}"></i></div>
+                  </div>
+                  <div class="student-level-body">
+                    <p class="text-sm text-secondary mb-3">${esc(lvl.Description || '')}</p>
+                    <div class="d-flex justify-between text-xs font-bold mb-1">
+                      <span>Completion Progress</span>
+                      <span>${pct}%</span>
+                    </div>
+                    <div class="progress-bar-wrap mb-3">
+                      <div class="progress-bar-fill" style="width:${pct}%;"></div>
+                    </div>
+                    <div class="d-flex justify-between text-xs text-muted mb-3">
+                      <span><i class="fa-solid fa-book-open"></i> ${lvl.Completed_Lessons || 0}/${lvl.Lessons_Count || 0} Lessons</span>
+                      <span><i class="fa-solid fa-file-signature"></i> ${lvl.Completed_Exams || 0}/${lvl.Exams_Count || 0} Exams</span>
+                      <span><i class="fa-solid fa-list-check"></i> ${lvl.Completed_Tasks || 0}/${lvl.Tasks_Count || 0} Tasks</span>
+                    </div>
+                    <div class="d-flex gap-2 mt-auto">
+                      <a href="levels.html?levelId=${encodeURIComponent(lvl.Level_ID)}" class="btn btn-primary btn-sm w-100">
+                        <i class="fa-solid fa-folder-open"></i> Open Level
+                      </a>
+                      <a href="lessons.html?levelId=${encodeURIComponent(lvl.Level_ID)}" class="btn btn-secondary btn-sm">
+                        <i class="fa-solid fa-book-open"></i> Study
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          }
+
+          // Render Available Exams
+          const examsBox = document.getElementById('dashboard-exams-list');
+          if (exams.length === 0) {
+            examsBox.innerHTML = `<p class="text-muted text-sm text-center py-3">No exams available for your assigned levels yet.</p>`;
+          } else {
+            examsBox.innerHTML = exams.slice(0, 4).map(function(ex) {
+              return `
+                <div class="d-flex justify-between align-center py-2" style="padding:0.65rem 0;border-bottom:1px solid var(--border-color);">
+                  <div>
+                    <div class="font-bold">${esc(ex.Exam_Title)}</div>
+                    <div class="text-xs text-muted">${esc(ex.Level_Name)} &bull; ${ex.Duration} mins &bull; ${ex.Total_Marks} marks &bull; Remaining Attempts: ${ex.Remaining_Attempts}</div>
+                  </div>
+                  <a href="${ex.Can_Start ? 'exam-player.html?examId=' + encodeURIComponent(ex.Exam_ID) : 'exams.html'}" class="btn ${ex.Can_Start ? 'btn-primary' : 'btn-secondary'} btn-sm">
+                    ${ex.Active_Attempt_ID ? 'Resume' : (ex.Can_Start ? 'Start Exam' : 'Details')}
+                  </a>
+                </div>
+              `;
+            }).join('');
+          }
+
+          // Render Tasks
+          const tasksBox = document.getElementById('dashboard-tasks-list');
+          if (tasks.length === 0) {
+            tasksBox.innerHTML = `<p class="text-muted text-sm text-center py-3">No tasks assigned to your levels yet.</p>`;
+          } else {
+            tasksBox.innerHTML = tasks.slice(0, 4).map(function(tk) {
+              return `
+                <div class="d-flex justify-between align-center py-2" style="padding:0.65rem 0;border-bottom:1px solid var(--border-color);">
+                  <div>
+                    <div class="font-bold">${esc(tk.Task_Title)}</div>
+                    <div class="text-xs text-muted">${esc(tk.Level_Name)} &bull; Max Score: ${tk.Max_Score}</div>
+                  </div>
+                  <div class="d-flex align-center gap-2">
+                    ${window.Helpers.renderStatusBadge(tk.Student_Status)}
+                    <a href="task-player.html?taskId=${encodeURIComponent(tk.Task_ID)}" class="btn btn-secondary btn-sm">Open</a>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          }
+
+          // Render Recent Activity
+          const actTbody = document.getElementById('recent-activity-tbody');
+          if (acts.length === 0) {
+            actTbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted" style="padding:1.5rem;">No activity recorded yet. Start studying a lesson or taking a practice task!</td></tr>`;
+          } else {
+            actTbody.innerHTML = acts.map(function(a) {
+              return `
+                <tr>
+                  <td><span class="badge badge-primary">${esc(String(a.Activity_Type || '').replace(/_/g, ' '))}</span></td>
+                  <td>${esc(a.Level_Name || a.Level_ID || '—')}${a.Lesson_Title ? ' &bull; ' + esc(a.Lesson_Title) : ''}</td>
+                  <td><code>${esc(a.Reference_ID || '—')}</code></td>
+                  <td class="text-sm text-muted">${window.Helpers.formatDateTime(a.Activity_Date)}</td>
+                </tr>
+              `;
+            }).join('');
+          }
+        } catch (err) {
+          window.Helpers.showToast(err.message, 'error');
+        }
+      }
+
+      loadDashboard();
+    })();
+  </script>
+</body>
+</html>

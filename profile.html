@@ -1,0 +1,275 @@
+﻿<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Academic Progress &amp; Transcript — Lingo Student Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="assets/css/global.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <link rel="stylesheet" href="assets/css/student.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body>
+  <!-- Student Navbar -->
+  <header class="student-navbar">
+    <div class="student-navbar-inner">
+      <a href="dashboard.html" class="student-brand">
+        <div class="student-brand-logo"><i class="fa-solid fa-graduation-cap"></i></div>
+        <span>Lingo Student</span>
+      </a>
+
+      <nav class="student-nav-links">
+        <a href="dashboard.html" class="student-nav-link"><i class="fa-solid fa-house"></i> <span data-i18n="Dashboard">Dashboard</span></a>
+        <a href="levels.html" class="student-nav-link"><i class="fa-solid fa-layer-group"></i> <span data-i18n="My Levels">My Levels</span></a>
+        <a href="lessons.html" class="student-nav-link"><i class="fa-solid fa-book-open"></i> <span data-i18n="Lessons">Lessons</span></a>
+        <a href="exams.html" class="student-nav-link"><i class="fa-solid fa-file-signature"></i> <span data-i18n="Exams">Exams</span></a>
+        <a href="tasks.html" class="student-nav-link"><i class="fa-solid fa-list-check"></i> <span data-i18n="Tasks">Tasks</span></a>
+        <a href="profile.html" class="student-nav-link active"><i class="fa-solid fa-chart-pie"></i> <span data-i18n="My Profile">My Progress</span></a>
+      </nav>
+
+      <div class="d-flex align-center gap-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-action="toggle-lang">
+          <i class="fa-solid fa-language"></i> <span data-lang-toggleLabel>عربي</span>
+        </button>
+        <div class="avatar avatar-sm" data-student-avatar>ST</div>
+        <button type="button" class="btn btn-outline-danger btn-sm" data-action="logout">
+          <i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="Logout">Logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="student-container">
+    <!-- Top Header & Transcript Export Actions -->
+    <div class="d-flex justify-between align-center flex-wrap gap-3 mb-4">
+      <div>
+        <h1 style="font-size:1.5rem;" data-i18n="My Profile">My Academic Progress &amp; Performance Analytics</h1>
+        <p class="text-muted text-sm">Track your normalized scores, level-by-level mastery, exam history, and official academic transcript.</p>
+      </div>
+      <div class="d-flex align-center gap-2">
+        <button type="button" class="btn btn-secondary" id="export-my-csv-btn" disabled>
+          <i class="fa-solid fa-file-csv"></i> Export CSV
+        </button>
+        <button type="button" class="btn btn-primary" id="print-my-transcript-btn" disabled>
+          <i class="fa-solid fa-print"></i> Print / Save Academic Transcript (PDF)
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="profile-loading-box" class="card">
+      <div class="loading-state">
+        <span class="spinner"></span>
+        <p class="mt-2">Calculating your normalized academic performance...</p>
+      </div>
+    </div>
+
+    <!-- Main Profile Content -->
+    <div id="profile-main-content" class="d-none">
+      <!-- Personal Information Banner -->
+      <div class="card mb-4">
+        <div class="card-body d-flex justify-between align-center flex-wrap gap-4">
+          <div class="d-flex align-center gap-4">
+            <div class="avatar avatar-lg" id="stu-profile-avatar">ST</div>
+            <div>
+              <div class="d-flex align-center gap-2 mb-1">
+                <h2 style="font-size:1.35rem;margin:0;" id="stu-profile-name">--</h2>
+                <span id="stu-profile-status"></span>
+              </div>
+              <div class="d-flex flex-wrap gap-3 text-sm text-secondary">
+                <span><i class="fa-solid fa-id-badge text-primary"></i> Code: <strong id="stu-profile-code" style="font-family:monospace;">--</strong></span>
+                <span><i class="fa-solid fa-phone text-primary"></i> Phone: <strong id="stu-profile-phone">--</strong></span>
+                <span><i class="fa-regular fa-calendar text-primary"></i> Joined: <strong id="stu-profile-joined">--</strong></span>
+              </div>
+              <div class="d-flex flex-wrap gap-2 mt-2" id="stu-profile-levels-badges"></div>
+            </div>
+          </div>
+
+          <div style="text-align:center;padding:1rem 1.5rem;background:var(--bg-body);border:1px solid var(--border-color);border-radius:14px;">
+            <span class="text-xs text-muted uppercase font-bold d-block mb-1">Academic Rating</span>
+            <div style="font-size:1.85rem;font-weight:800;line-height:1;" id="stu-rating-grade">--</div>
+            <span class="badge badge-primary mt-2" id="stu-rating-label">--</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 Overall Performance KPI Cards -->
+      <div class="kpi-grid mb-6" id="stu-profile-kpis"></div>
+
+      <!-- Charts Row: Score Progression & Level Comparison -->
+      <div class="charts-grid mb-6">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="fa-solid fa-chart-line text-primary"></i> Assessment Score Progression Over Time</h3>
+            <span id="stu-trend-badge" class="badge badge-secondary">Stable</span>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="stu-profile-trend-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="fa-solid fa-chart-column text-primary"></i> Performance &amp; Completion by Level</h3>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="stu-profile-level-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Official Printable 12-Section Academic Report Sheet -->
+      <div id="stu-printable-report-mount"></div>
+    </div>
+  </main>
+
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/helpers.js"></script>
+  <script src="assets/js/charts.js"></script>
+  <script src="assets/js/reports.js"></script>
+  <script>
+    (async function() {
+      const session = await window.Auth.requireStudent();
+      if (!session) return;
+
+      const esc = window.Helpers.escapeHtml;
+      let fullReport = null;
+
+      const loadingBox = document.getElementById('profile-loading-box');
+      const mainContent = document.getElementById('profile-main-content');
+      const printBtn = document.getElementById('print-my-transcript-btn');
+      const csvBtn = document.getElementById('export-my-csv-btn');
+
+      async function loadMyProfile() {
+        try {
+          fullReport = await window.API.generateStudentReport({ studentId: session.userId });
+
+          loadingBox.classList.add('d-none');
+          mainContent.classList.remove('d-none');
+          printBtn.disabled = false;
+          csvBtn.disabled = false;
+
+          renderPersonalBanner(fullReport);
+          renderKpis(fullReport.overallPerformance || {});
+
+          if (window.Charts) {
+            window.Charts.renderStudentTrendChart('stu-profile-trend-canvas', fullReport.performanceTrends);
+            window.Charts.renderPerformanceByLevelChart('stu-profile-level-canvas', fullReport.levelByLevelAnalysis);
+          }
+
+          // Render the complete 12-section printable report below the interactive charts
+          window.Reports.renderPrintableReport(
+            document.getElementById('stu-printable-report-mount'),
+            fullReport
+          );
+        } catch (err) {
+          loadingBox.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon"><i class="fa-solid fa-triangle-exclamation text-danger"></i></div>
+              <h3>Unable to Load Academic Profile</h3>
+              <p class="text-danger">${esc(err.message)}</p>
+            </div>
+          `;
+        }
+      }
+
+      function renderPersonalBanner(rpt) {
+        const stu = rpt.personalInfo || {};
+        const evalBox = rpt.finalEvaluation || {};
+        const levels = rpt.assignedLevels || [];
+        const trends = rpt.performanceTrends || {};
+
+        document.getElementById('stu-profile-avatar').textContent = window.Helpers.getInitials(stu.Full_Name);
+        document.getElementById('stu-profile-name').textContent = stu.Full_Name || session.fullName;
+        document.getElementById('stu-profile-status').innerHTML = window.Helpers.renderStatusBadge(stu.Account_Status || 'ACTIVE');
+        document.getElementById('stu-profile-code').textContent = stu.Student_Code || session.studentCode;
+        document.getElementById('stu-profile-phone').textContent = stu.Phone || 'Not Provided';
+        document.getElementById('stu-profile-joined').textContent = window.Helpers.formatDate(stu.Created_At);
+
+        document.getElementById('stu-profile-levels-badges').innerHTML = levels.map(function(l) {
+          return `<span class="badge badge-primary"><i class="fa-solid fa-layer-group"></i> ${esc(l.levelName)} (${l.completionRate}%)</span>`;
+        }).join('');
+
+        const gradeEl = document.getElementById('stu-rating-grade');
+        gradeEl.textContent = evalBox.gradeBand || 'N/A';
+        gradeEl.style.color = evalBox.ratingColor || '#4f46e5';
+
+        const labelEl = document.getElementById('stu-rating-label');
+        labelEl.textContent = evalBox.ratingLabel || 'In Progress';
+
+        const trendBadge = document.getElementById('stu-trend-badge');
+        if (trends.trendDirection === 'IMPROVING') {
+          trendBadge.className = 'badge badge-success';
+          trendBadge.innerHTML = `<i class="fa-solid fa-arrow-trend-up"></i> Improving (+${trends.trendDelta}%)`;
+        } else if (trends.trendDirection === 'DECLINING') {
+          trendBadge.className = 'badge badge-danger';
+          trendBadge.innerHTML = `<i class="fa-solid fa-arrow-trend-down"></i> Declining (${trends.trendDelta}%)`;
+        } else {
+          trendBadge.className = 'badge badge-info';
+          trendBadge.innerHTML = `<i class="fa-solid fa-minus"></i> Consistent Trajectory`;
+        }
+      }
+
+      function renderKpis(ov) {
+        const overallPct = Number(ov.overallAveragePercentage || 0);
+        document.getElementById('stu-profile-kpis').innerHTML = `
+          <div class="kpi-card">
+            <div class="kpi-info">
+              <span class="kpi-label">Overall Academic Score</span>
+              <h3 class="kpi-value" style="color:${window.Helpers.getPerformanceColor(overallPct)};">${overallPct}%</h3>
+              <p class="kpi-sub">Normalized Across Graded Work</p>
+            </div>
+            <div class="kpi-icon indigo"><i class="fa-solid fa-award"></i></div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info">
+              <span class="kpi-label">Exam Average</span>
+              <h3 class="kpi-value">${ov.hasExamScores ? ov.averageExamScore + '%' : 'N/A'}</h3>
+              <p class="kpi-sub">${ov.passedExams || 0} Passed &bull; ${ov.failedExams || 0} Failed</p>
+            </div>
+            <div class="kpi-icon emerald"><i class="fa-solid fa-file-signature"></i></div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info">
+              <span class="kpi-label">Task Average</span>
+              <h3 class="kpi-value">${ov.hasTaskScores ? ov.averageTaskScore + '%' : 'N/A'}</h3>
+              <p class="kpi-sub">${ov.completedTasks || 0} Completed &bull; ${ov.pendingTasks || 0} Pending</p>
+            </div>
+            <div class="kpi-icon sky"><i class="fa-solid fa-list-check"></i></div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info">
+              <span class="kpi-label">Curriculum Completion</span>
+              <h3 class="kpi-value">${ov.levelCompletionPercentage || 0}%</h3>
+              <p class="kpi-sub">${ov.completedLessons || 0} / ${ov.availableLessons || 0} Lessons Studied</p>
+            </div>
+            <div class="kpi-icon amber"><i class="fa-solid fa-book-open-reader"></i></div>
+          </div>
+        `;
+      }
+
+      printBtn.addEventListener('click', function() {
+        window.print();
+      });
+
+      csvBtn.addEventListener('click', function() {
+        if (fullReport) {
+          window.Reports.exportStudentReportCsv(fullReport);
+        }
+      });
+
+      await loadMyProfile();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+/**
+ * ============================================================================
+ * Lingo Examination & Student Management Platform
+ * File: assets/css/responsive.css
+ * Purpose: Responsive breakpoints for Desktop, Tablet, and Mobile viewports,
+ *          plus RTL drawer slide behavior.
+ * ============================================================================
+ */
+
+@media (max-width: 1200px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+  .exam-player-grid {
+    grid-template-columns: 1fr 280px;
+  }
+}
+
+@media (max-width: 992px) {
+  /* Admin Sidebar Slide-out Drawer */
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  [dir="rtl"] .sidebar {
+    transform: translateX(100%);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-lg);
+  }
+  .main-wrapper {
+    margin-inline-start: 0;
+  }
+  .sidebar-toggle-btn {
+    display: inline-flex;
+  }
+  .lesson-reader-layout {
+    grid-template-columns: 1fr;
+  }
+  .exam-player-grid {
+    grid-template-columns: 1fr;
+  }
+  .media-upload-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-row-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content,
+  .student-container {
+    padding: 1.15rem 1rem;
+  }
+  .topbar {
+    padding: 0 1rem;
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  .welcome-banner {
+    padding: 1.5rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .welcome-stats-pill {
+    width: 100%;
+    justify-content: space-around;
+  }
+  .student-navbar-inner {
+    height: auto;
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+  }
+  .student-nav-links {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    justify-content: flex-start;
+  }
+  .report-sheet {
+    padding: 1.25rem;
+  }
+  .modal-body, .card-body {
+    padding: 1.15rem;
+  }
+  .question-stage-card {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .levels-grid,
+  .student-levels-grid,
+  .student-circular-grid {
+    grid-template-columns: 1fr;
+  }
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .search-box {
+    max-width: 100%;
+  }
+  .filter-group {
+    width: 100%;
+  }
+  .filter-group .form-select {
+    flex: 1;
+  }
+}

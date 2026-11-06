@@ -1,0 +1,710 @@
+﻿<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Workspace — Lingo Student Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <link rel="stylesheet" href="assets/css/student.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body>
+  <!-- Student Navbar -->
+  <header class="student-navbar">
+    <div class="student-navbar-inner">
+      <a href="dashboard.html" class="student-brand">
+        <div class="student-brand-logo"><i class="fa-solid fa-graduation-cap"></i></div>
+        <span>Lingo Student</span>
+      </a>
+
+      <nav class="student-nav-links">
+        <a href="dashboard.html" class="student-nav-link"><i class="fa-solid fa-house"></i> <span data-i18n="Dashboard">Dashboard</span></a>
+        <a href="levels.html" class="student-nav-link"><i class="fa-solid fa-layer-group"></i> <span data-i18n="My Levels">My Levels</span></a>
+        <a href="lessons.html" class="student-nav-link"><i class="fa-solid fa-book-open"></i> <span data-i18n="Lessons">Lessons</span></a>
+        <a href="exams.html" class="student-nav-link"><i class="fa-solid fa-file-signature"></i> <span data-i18n="Exams">Exams</span></a>
+        <a href="tasks.html" class="student-nav-link active"><i class="fa-solid fa-list-check"></i> <span data-i18n="Tasks">Tasks</span></a>
+        <a href="profile.html" class="student-nav-link"><i class="fa-solid fa-chart-pie"></i> <span data-i18n="My Profile">My Progress</span></a>
+      </nav>
+
+      <div class="d-flex align-center gap-2">
+        <a href="tasks.html" class="btn btn-secondary btn-sm">
+          <i class="fa-solid fa-arrow-left"></i> Back to Tasks
+        </a>
+        <div class="avatar avatar-sm" data-student-avatar>ST</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="student-container">
+    <!-- Loading State -->
+    <div id="task-loading-box" class="card">
+      <div class="loading-state">
+        <span class="spinner"></span>
+        <p class="mt-2">Loading coursework task and questions...</p>
+      </div>
+    </div>
+
+    <!-- Main Task Workspace -->
+    <div id="task-workspace-container" class="d-none">
+      <!-- Task Header Summary Card -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="d-flex justify-between align-center flex-wrap gap-3 mb-3">
+            <div>
+              <div class="d-flex align-center gap-2 mb-2" id="task-badges-row"></div>
+              <h1 style="font-size:1.5rem;margin-bottom:0.25rem;" id="task-title-heading">--</h1>
+              <p class="text-muted text-sm" id="task-description-text"></p>
+            </div>
+            <div class="d-flex align-center gap-2" id="task-top-actions">
+              <button type="button" class="btn btn-secondary" id="save-draft-top-btn">
+                <i class="fa-solid fa-floppy-disk"></i> Save Draft
+              </button>
+              <button type="button" class="btn btn-primary" id="submit-task-top-btn">
+                <i class="fa-solid fa-paper-plane"></i> Submit Task
+              </button>
+            </div>
+          </div>
+
+          <div id="task-instructions-banner" class="alert alert-info mb-0 d-none">
+            <i class="fa-solid fa-circle-info"></i>
+            <div id="task-instructions-content"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Existing Submission Result & Teacher Feedback Banner (if already submitted) -->
+      <div id="existing-submission-banner" class="card mb-4 d-none"></div>
+
+      <!-- Questions List -->
+      <div id="task-questions-list" class="d-flex flex-column gap-4 mb-4"></div>
+
+      <!-- Optional Student Attachment Upload Section -->
+      <div id="student-attachment-card" class="card mb-4 d-none">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-paperclip text-primary"></i> Supporting Attachments (Google Drive)</h3>
+        </div>
+        <div class="card-body">
+          <p class="text-sm text-muted mb-3">You may upload supporting images, audio recordings, or short videos as part of your task response.</p>
+          <div class="d-flex align-center gap-3 flex-wrap mb-3">
+            <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Upload Attachment to Google Drive
+              <input type="file" id="student-task-file-input" accept="image/*,audio/*,video/*" style="display:none;">
+            </label>
+            <span class="text-xs text-muted" id="student-upload-status"></span>
+          </div>
+          <div id="student-attachments-list" class="d-flex flex-column gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Bottom Submit Actions Bar -->
+      <div class="card" id="task-bottom-actions-card">
+        <div class="card-body d-flex justify-between align-center flex-wrap gap-3">
+          <div class="text-sm text-muted" id="task-progress-summary">
+            Complete all questions above and click <strong>Submit Task</strong> when ready.
+          </div>
+          <div class="d-flex align-center gap-2">
+            <button type="button" class="btn btn-secondary" id="save-draft-bottom-btn">
+              <i class="fa-solid fa-floppy-disk"></i> Save Draft Progress
+            </button>
+            <button type="button" class="btn btn-success" id="submit-task-bottom-btn">
+              <i class="fa-solid fa-paper-plane"></i> Finalize &amp; Submit Task
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/validation.js"></script>
+  <script src="assets/js/helpers.js"></script>
+  <script>
+    (async function() {
+      const session = await window.Auth.requireStudent();
+      if (!session) return;
+
+      const esc = window.Helpers.escapeHtml;
+      const taskId = window.Helpers.getQueryParam('taskId');
+      if (!taskId) {
+        window.location.href = 'tasks.html';
+        return;
+      }
+
+      const startTimeMs = Date.now();
+      let taskData = null;
+      let questions = [];
+      let studentAnswers = {};
+      let studentAttachments = [];
+      let isReadOnly = false;
+
+      const loadingBox = document.getElementById('task-loading-box');
+      const workspaceContainer = document.getElementById('task-workspace-container');
+      const questionsListEl = document.getElementById('task-questions-list');
+      const existingBannerEl = document.getElementById('existing-submission-banner');
+      const attachmentCard = document.getElementById('student-attachment-card');
+      const attachmentsListEl = document.getElementById('student-attachments-list');
+
+      async function loadTask() {
+        try {
+          taskData = await window.API.getTaskForStudent({ taskId: taskId });
+          questions = Array.isArray(taskData.questions) ? taskData.questions : [];
+
+          const existing = taskData.existingSubmission;
+          if (existing) {
+            studentAnswers = existing.savedAnswers || {};
+            studentAttachments = Array.isArray(existing.attachments) ? existing.attachments : [];
+          }
+
+          // Initialize ordering questions if not yet answered
+          questions.forEach(function(q) {
+            if (q.type === 'ordering' && !studentAnswers[q.question_id]) {
+              studentAnswers[q.question_id] = (q.ordering_items || []).slice();
+            }
+          });
+
+          loadingBox.classList.add('d-none');
+          workspaceContainer.classList.remove('d-none');
+
+          renderTaskHeader();
+
+          if (existing && String(existing.Submission_Status).toUpperCase() !== 'DRAFT') {
+            renderSubmittedSummary(existing);
+          }
+
+          renderAllQuestions();
+
+          if (taskData.allow_attachments) {
+            attachmentCard.classList.remove('d-none');
+            renderAttachmentsList();
+          }
+
+          updateProgressCounter();
+        } catch (err) {
+          loadingBox.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon"><i class="fa-solid fa-circle-exclamation text-danger"></i></div>
+              <h3>Unable to Open Task</h3>
+              <p class="text-danger">${esc(err.message)}</p>
+              <a href="tasks.html" class="btn btn-primary"><i class="fa-solid fa-arrow-left"></i> Back to Tasks</a>
+            </div>
+          `;
+        }
+      }
+
+      function renderTaskHeader() {
+        document.getElementById('task-title-heading').textContent = taskData.Task_Title || 'Task Assignment';
+        document.getElementById('task-description-text').textContent = taskData.description || '';
+
+        const isOverdue = taskData.Deadline && new Date(taskData.Deadline).getTime() < Date.now();
+        document.getElementById('task-badges-row').innerHTML = `
+          <span class="badge badge-primary">${esc(taskData.Level_Name || taskData.Level_ID)}</span>
+          ${taskData.Lesson_Title ? `<span class="badge badge-info">${esc(taskData.Lesson_Title)}</span>` : ''}
+          <span class="badge badge-secondary">${esc(String(taskData.Task_Type || 'practice').toUpperCase())}</span>
+          <span class="badge badge-success"><i class="fa-solid fa-star"></i> Max Score: ${taskData.Max_Score || 20} pts</span>
+          ${taskData.Deadline ? `<span class="badge ${isOverdue ? 'badge-danger' : 'badge-warning'}"><i class="fa-regular fa-calendar"></i> Due: ${window.Helpers.formatDateTime(taskData.Deadline)}</span>` : ''}
+        `;
+
+        if (taskData.instructions) {
+          const instBanner = document.getElementById('task-instructions-banner');
+          instBanner.classList.remove('d-none');
+          document.getElementById('task-instructions-content').innerHTML = `<strong>Instructions:</strong> ${esc(taskData.instructions)}`;
+        }
+      }
+
+      function renderSubmittedSummary(sub) {
+        const isGraded = String(sub.Grading_Status).toUpperCase() === 'GRADED';
+        const pct = Math.round(Number(sub.Percentage || 0));
+        existingBannerEl.classList.remove('d-none');
+
+        const breakdown = Array.isArray(sub.breakdown) ? sub.breakdown : [];
+
+        existingBannerEl.innerHTML = `
+          <div class="card-header" style="background:rgba(16,185,129,0.06);">
+            <div class="d-flex justify-between align-center flex-wrap gap-2 w-100">
+              <h3 class="card-title text-success">
+                <i class="fa-solid fa-circle-check"></i> Task Submitted (${window.Helpers.formatDateTime(sub.Submission_Date)})
+              </h3>
+              <div class="d-flex align-center gap-2">
+                <span class="badge ${isGraded ? 'badge-success' : 'badge-warning'}">${esc(sub.Grading_Status)}</span>
+                <span class="badge badge-primary">Score: ${sub.Score} / ${sub.Total_Marks} (${pct}%)</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            ${sub.Teacher_Feedback ? `
+              <div class="alert alert-info mb-3">
+                <i class="fa-solid fa-chalkboard-user"></i>
+                <div>
+                  <strong>Teacher Feedback:</strong>
+                  <div class="mt-1">${esc(sub.Teacher_Feedback)}</div>
+                </div>
+              </div>
+            ` : `
+              <p class="text-sm text-muted mb-3">
+                ${isGraded ? 'Your submission has been graded.' : 'Your submission has been recorded and is awaiting teacher review/feedback.'}
+              </p>
+            `}
+
+            ${breakdown.length > 0 ? `
+              <details>
+                <summary style="cursor:pointer;font-weight:700;font-size:0.9rem;color:var(--primary);">
+                  <i class="fa-solid fa-list-check"></i> View Question-by-Question Grading Breakdown (${breakdown.length} Questions)
+                </summary>
+                <div class="d-flex flex-column gap-2 mt-3">
+                  ${breakdown.map(function(item, idx) {
+                    const stBadge = item.status === 'CORRECT'
+                      ? '<span class="badge badge-success">Correct</span>'
+                      : (item.status === 'PENDING_MANUAL'
+                        ? '<span class="badge badge-warning">Pending Manual Review</span>'
+                        : (item.status === 'PARTIAL' ? '<span class="badge badge-info">Partial Credit</span>' : '<span class="badge badge-danger">Incorrect</span>'));
+                    return `
+                      <div style="padding:0.85rem;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-body);">
+                        <div class="d-flex justify-between align-center flex-wrap gap-2 mb-1">
+                          <span class="font-bold text-sm">Q${idx + 1}: ${esc(item.question_text)}</span>
+                          <div class="d-flex gap-2 align-center">
+                            ${stBadge}
+                            <span class="badge badge-secondary">${item.earned_points} / ${item.max_points} pts</span>
+                          </div>
+                        </div>
+                        ${item.explanation ? `<div class="text-xs text-muted mt-1"><i class="fa-solid fa-lightbulb text-warning"></i> <strong>Explanation:</strong> ${esc(item.explanation)}</div>` : ''}
+                        ${item.teacher_comment ? `<div class="text-xs text-primary mt-1"><i class="fa-solid fa-comment"></i> <strong>Comment:</strong> ${esc(item.teacher_comment)}</div>` : ''}
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </details>
+            ` : ''}
+          </div>
+        `;
+      }
+
+      function renderQuestionInputHtml(q, qIdx) {
+        const qId = q.question_id;
+        const currentAns = studentAnswers[qId];
+
+        if (q.type === 'multiple_choice_single' || q.type === 'true_false') {
+          const opts = Array.isArray(q.options) ? q.options : [];
+          return `
+            <div class="answer-options-list" data-question-id="${esc(qId)}">
+              ${opts.map(function(opt) {
+                const selected = String(currentAns) === String(opt.option_id);
+                return `
+                  <div class="answer-option-item ${selected ? 'selected' : ''}" data-q-single="${esc(qId)}" data-opt-id="${esc(opt.option_id)}">
+                    <div class="option-key-badge">${esc(opt.option_id)}</div>
+                    <div style="font-size:0.95rem;font-weight:500;">${esc(opt.text)}</div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        if (q.type === 'multiple_choice_multiple') {
+          const opts = Array.isArray(q.options) ? q.options : [];
+          const selArr = Array.isArray(currentAns) ? currentAns.map(String) : [];
+          return `
+            <div class="text-xs text-muted mb-2"><i class="fa-solid fa-check-double"></i> Select all correct answers:</div>
+            <div class="answer-options-list" data-question-id="${esc(qId)}">
+              ${opts.map(function(opt) {
+                const selected = selArr.indexOf(String(opt.option_id)) !== -1;
+                return `
+                  <div class="answer-option-item ${selected ? 'selected' : ''}" data-q-multi="${esc(qId)}" data-opt-id="${esc(opt.option_id)}">
+                    <div class="option-key-badge">${selected ? '<i class="fa-solid fa-check"></i>' : esc(opt.option_id)}</div>
+                    <div style="font-size:0.95rem;font-weight:500;">${esc(opt.text)}</div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        if (q.type === 'short_answer') {
+          return `
+            <div class="form-group mb-0">
+              <label class="form-label">Your Short Answer:</label>
+              <input type="text" class="form-control task-short-input" data-q-id="${esc(qId)}" value="${esc(currentAns || '')}" placeholder="Type your answer here...">
+            </div>
+          `;
+        }
+
+        if (q.type === 'fill_in_the_blanks') {
+          const blankMatches = String(q.text || '').match(/_{2,}/g) || ['_____'];
+          const count = Math.max(1, blankMatches.length);
+          const arr = Array.isArray(currentAns) ? currentAns : (currentAns ? [currentAns] : []);
+          let html = `<div class="d-flex flex-column gap-2">`;
+          for (let b = 0; b < count; b++) {
+            html += `
+              <div class="d-flex align-center gap-3">
+                <span class="badge badge-primary" style="min-width:85px;justify-content:center;">Blank #${b + 1}</span>
+                <input type="text" class="form-control task-blank-input" data-q-id="${esc(qId)}" data-blank-idx="${b}" value="${esc(arr[b] || '')}" placeholder="Missing word/phrase for Blank #${b + 1}...">
+              </div>
+            `;
+          }
+          html += `</div>`;
+          return html;
+        }
+
+        if (q.type === 'matching') {
+          const prompts = q.matching_prompts || [];
+          const choices = q.matching_choices || [];
+          const ansMap = (currentAns && typeof currentAns === 'object' && !Array.isArray(currentAns)) ? currentAns : {};
+          return `
+            <div class="d-flex flex-column gap-2">
+              ${prompts.map(function(p) {
+                const selectedVal = ansMap[p.id] || '';
+                return `
+                  <div class="form-row align-center" style="padding:0.75rem;background:var(--bg-body);border:1px solid var(--border-color);border-radius:10px;">
+                    <div class="font-semibold">${esc(p.left)}</div>
+                    <select class="form-select task-matching-select" data-q-id="${esc(qId)}" data-match-key="${esc(p.id)}">
+                      <option value="">-- Select Matching Item --</option>
+                      ${choices.map(function(ch) {
+                        return `<option value="${esc(ch)}" ${selectedVal === ch ? 'selected' : ''}>${esc(ch)}</option>`;
+                      }).join('')}
+                    </select>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        if (q.type === 'ordering') {
+          const seq = Array.isArray(currentAns) && currentAns.length > 0
+            ? currentAns
+            : (q.ordering_items || []);
+          return `
+            <div class="text-xs text-muted mb-2">Use the Up and Down buttons to arrange the items in the correct sequence:</div>
+            <div class="d-flex flex-column gap-1">
+              ${seq.map(function(itemText, sIdx) {
+                return `
+                  <div class="ordering-item-row">
+                    <div class="d-flex align-center gap-3">
+                      <span class="badge badge-primary">#${sIdx + 1}</span>
+                      <span class="font-semibold">${esc(itemText)}</span>
+                    </div>
+                    <div class="d-flex gap-1">
+                      <button type="button" class="btn btn-icon btn-secondary btn-sm" data-q-order-up="${esc(qId)}" data-idx="${sIdx}" ${sIdx === 0 ? 'disabled' : ''}><i class="fa-solid fa-arrow-up"></i></button>
+                      <button type="button" class="btn btn-icon btn-secondary btn-sm" data-q-order-down="${esc(qId)}" data-idx="${sIdx}" ${sIdx === seq.length - 1 ? 'disabled' : ''}><i class="fa-solid fa-arrow-down"></i></button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        if (q.type === 'essay') {
+          return `
+            <div class="form-group mb-0">
+              <label class="form-label">Your Response:</label>
+              <textarea class="form-control task-essay-input" data-q-id="${esc(qId)}" rows="5" placeholder="Write your response here...">${esc(currentAns || '')}</textarea>
+            </div>
+          `;
+        }
+
+        return '';
+      }
+
+      function renderAllQuestions() {
+        if (questions.length === 0) {
+          questionsListEl.innerHTML = `
+            <div class="card">
+              <div class="card-body text-center text-muted">
+                No structured questions in this task. Follow the task instructions above.
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        questionsListEl.innerHTML = questions.map(function(q, idx) {
+          const media = q.media || {};
+          return `
+            <div class="card" id="task-q-card-${esc(q.question_id)}">
+              <div class="card-header">
+                <div class="d-flex align-center gap-2">
+                  <span class="badge badge-primary">Question #${idx + 1}</span>
+                  <span class="badge badge-secondary">${esc(String(q.type || '').replace(/_/g, ' '))}</span>
+                </div>
+                <span class="badge badge-info">${q.points || 1} pts</span>
+              </div>
+              <div class="card-body">
+                <div class="question-prompt-text" style="font-size:1.05rem;">${esc(q.text)}</div>
+
+                ${(media.image || media.audio || media.video) ? `
+                  <div class="question-media-showcase">
+                    ${media.image && media.image.url ? `<img src="${esc(media.image.url)}" alt="Question Attachment">` : ''}
+                    ${media.audio && media.audio.url ? `<audio controls src="${esc(media.audio.url)}" class="w-100"></audio>` : ''}
+                    ${media.video && media.video.url ? `<video controls src="${esc(media.video.url)}" style="max-height:320px;width:100%;border-radius:10px;"></video>` : ''}
+                  </div>
+                ` : ''}
+
+                ${renderQuestionInputHtml(q, idx)}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        bindQuestionInputs();
+      }
+
+      function bindQuestionInputs() {
+        // Single choice
+        questionsListEl.querySelectorAll('[data-q-single]').forEach(function(el) {
+          el.addEventListener('click', function() {
+            const qId = el.getAttribute('data-q-single');
+            const optId = el.getAttribute('data-opt-id');
+            studentAnswers[qId] = optId;
+            renderAllQuestions();
+            updateProgressCounter();
+          });
+        });
+
+        // Multi choice
+        questionsListEl.querySelectorAll('[data-q-multi]').forEach(function(el) {
+          el.addEventListener('click', function() {
+            const qId = el.getAttribute('data-q-multi');
+            const optId = el.getAttribute('data-opt-id');
+            let arr = Array.isArray(studentAnswers[qId]) ? studentAnswers[qId].slice() : [];
+            const pos = arr.indexOf(optId);
+            if (pos === -1) arr.push(optId);
+            else arr.splice(pos, 1);
+            studentAnswers[qId] = arr;
+            renderAllQuestions();
+            updateProgressCounter();
+          });
+        });
+
+        // Short Answer
+        questionsListEl.querySelectorAll('.task-short-input').forEach(function(inp) {
+          inp.addEventListener('input', function() {
+            const qId = inp.getAttribute('data-q-id');
+            studentAnswers[qId] = inp.value;
+            updateProgressCounter();
+          });
+        });
+
+        // Fill in the blanks
+        questionsListEl.querySelectorAll('.task-blank-input').forEach(function(inp) {
+          inp.addEventListener('input', function() {
+            const qId = inp.getAttribute('data-q-id');
+            const card = document.getElementById('task-q-card-' + qId);
+            const allBlanks = Array.from(card.querySelectorAll('.task-blank-input')).map(function(i) { return i.value; });
+            studentAnswers[qId] = allBlanks;
+            updateProgressCounter();
+          });
+        });
+
+        // Matching
+        questionsListEl.querySelectorAll('.task-matching-select').forEach(function(sel) {
+          sel.addEventListener('change', function() {
+            const qId = sel.getAttribute('data-q-id');
+            const card = document.getElementById('task-q-card-' + qId);
+            const map = {};
+            card.querySelectorAll('.task-matching-select').forEach(function(s) {
+              if (s.value) map[s.getAttribute('data-match-key')] = s.value;
+            });
+            studentAnswers[qId] = map;
+            updateProgressCounter();
+          });
+        });
+
+        // Ordering Up
+        questionsListEl.querySelectorAll('[data-q-order-up]').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            const qId = btn.getAttribute('data-q-order-up');
+            const idx = Number(btn.getAttribute('data-idx'));
+            const q = questions.find(function(item) { return item.question_id === qId; });
+            const arr = (Array.isArray(studentAnswers[qId]) ? studentAnswers[qId] : (q.ordering_items || [])).slice();
+            if (idx > 0) {
+              const tmp = arr[idx - 1];
+              arr[idx - 1] = arr[idx];
+              arr[idx] = tmp;
+              studentAnswers[qId] = arr;
+              renderAllQuestions();
+              updateProgressCounter();
+            }
+          });
+        });
+
+        // Ordering Down
+        questionsListEl.querySelectorAll('[data-q-order-down]').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            const qId = btn.getAttribute('data-q-order-down');
+            const idx = Number(btn.getAttribute('data-idx'));
+            const q = questions.find(function(item) { return item.question_id === qId; });
+            const arr = (Array.isArray(studentAnswers[qId]) ? studentAnswers[qId] : (q.ordering_items || [])).slice();
+            if (idx < arr.length - 1) {
+              const tmp = arr[idx + 1];
+              arr[idx + 1] = arr[idx];
+              arr[idx] = tmp;
+              studentAnswers[qId] = arr;
+              renderAllQuestions();
+              updateProgressCounter();
+            }
+          });
+        });
+
+        // Essay
+        questionsListEl.querySelectorAll('.task-essay-input').forEach(function(area) {
+          area.addEventListener('input', function() {
+            const qId = area.getAttribute('data-q-id');
+            studentAnswers[qId] = area.value;
+            updateProgressCounter();
+          });
+        });
+      }
+
+      function updateProgressCounter() {
+        let answered = 0;
+        questions.forEach(function(q) {
+          const val = studentAnswers[q.question_id];
+          if (val !== undefined && val !== null && val !== '') {
+            if (Array.isArray(val)) {
+              if (val.some(function(x) { return String(x).trim() !== ''; })) answered++;
+            } else if (typeof val === 'object') {
+              if (Object.keys(val).length > 0) answered++;
+            } else {
+              answered++;
+            }
+          }
+        });
+
+        document.getElementById('task-progress-summary').innerHTML =
+          `Progress: <strong>${answered} of ${questions.length}</strong> questions answered.`;
+      }
+
+      function renderAttachmentsList() {
+        if (studentAttachments.length === 0) {
+          attachmentsListEl.innerHTML = `<div class="text-xs text-muted">No files attached yet.</div>`;
+          return;
+        }
+        attachmentsListEl.innerHTML = studentAttachments.map(function(att, idx) {
+          return `
+            <div class="d-flex justify-between align-center" style="padding:0.6rem 0.9rem;background:var(--bg-body);border:1px solid var(--border-color);border-radius:8px;">
+              <div class="d-flex align-center gap-2 text-sm">
+                <i class="fa-solid fa-file-arrow-up text-primary"></i>
+                <a href="${esc(att.url || att.viewUrl || '#')}" target="_blank" rel="noopener" class="font-semibold">${esc(att.name || 'Attachment #' + (idx + 1))}</a>
+              </div>
+              <button type="button" class="btn btn-icon btn-outline-danger btn-sm" data-remove-att="${idx}">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          `;
+        }).join('');
+
+        attachmentsListEl.querySelectorAll('[data-remove-att]').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            const idx = Number(btn.getAttribute('data-remove-att'));
+            studentAttachments.splice(idx, 1);
+            renderAttachmentsList();
+          });
+        });
+      }
+
+      const fileInput = document.getElementById('student-task-file-input');
+      if (fileInput) {
+        fileInput.addEventListener('change', async function() {
+          const file = fileInput.files && fileInput.files[0];
+          if (!file) return;
+          const statusEl = document.getElementById('student-upload-status');
+          statusEl.textContent = 'Uploading ' + file.name + ' to Google Drive...';
+          try {
+            let category = 'image';
+            if (file.type.indexOf('audio/') === 0) category = 'audio';
+            else if (file.type.indexOf('video/') === 0) category = 'video';
+
+            const uploaded = await window.API.uploadMediaFile(file, category);
+            studentAttachments.push({
+              fileId: uploaded.fileId,
+              name: uploaded.fileName || file.name,
+              url: uploaded.url,
+              viewUrl: uploaded.viewUrl,
+              mimeType: uploaded.mimeType
+            });
+            statusEl.textContent = 'Uploaded successfully!';
+            renderAttachmentsList();
+          } catch (err) {
+            statusEl.textContent = '';
+            window.Helpers.showToast('Upload failed: ' + err.message, 'error');
+          } finally {
+            fileInput.value = '';
+          }
+        });
+      }
+
+      async function handleSaveDraft(btn) {
+        await window.Helpers.withButtonLoading(btn, async function() {
+          try {
+            await window.API.saveTaskProgress({
+              taskId: taskId,
+              answers: studentAnswers,
+              attachments: studentAttachments
+            });
+            window.Helpers.showToast('Task draft saved to your account.', 'success');
+          } catch (err) {
+            window.Helpers.showToast('Could not save draft: ' + err.message, 'error');
+          }
+        }, 'Saving...');
+      }
+
+      async function handleSubmitTask(btn) {
+        const confirmed = await window.Helpers.confirmDialog({
+          title: 'Submit Task Assignment?',
+          message: 'Are you ready to submit your answers for grading? Objective questions will be graded automatically and open-ended responses will be sent to your instructor.',
+          confirmText: 'Submit Task',
+          danger: false
+        });
+        if (!confirmed) return;
+
+        const durationSeconds = Math.round((Date.now() - startTimeMs) / 1000);
+
+        await window.Helpers.withButtonLoading(btn, async function() {
+          try {
+            const result = await window.API.submitTask({
+              taskId: taskId,
+              answers: studentAnswers,
+              attachments: studentAttachments,
+              durationSeconds: durationSeconds
+            });
+
+            window.Helpers.showToast('Task submitted successfully!', 'success');
+            renderSubmittedSummary({
+              Submission_ID: result.submissionId,
+              Submission_Date: result.submissionDate,
+              Submission_Status: result.submissionStatus,
+              Grading_Status: result.gradingStatus,
+              Score: result.score,
+              Total_Marks: result.totalMarks,
+              Percentage: result.percentage,
+              Teacher_Feedback: '',
+              breakdown: result.breakdown
+            });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } catch (err) {
+            window.Helpers.showToast('Submission failed: ' + err.message, 'error');
+          }
+        }, 'Submitting...');
+      }
+
+      document.getElementById('save-draft-top-btn').addEventListener('click', function() {
+        handleSaveDraft(this);
+      });
+      document.getElementById('save-draft-bottom-btn').addEventListener('click', function() {
+        handleSaveDraft(this);
+      });
+      document.getElementById('submit-task-top-btn').addEventListener('click', function() {
+        handleSubmitTask(this);
+      });
+      document.getElementById('submit-task-bottom-btn').addEventListener('click', function() {
+        handleSubmitTask(this);
+      });
+
+      await loadTask();
+    })();
+  </script>
+</body>
+</html>

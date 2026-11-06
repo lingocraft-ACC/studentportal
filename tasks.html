@@ -1,0 +1,251 @@
+﻿<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coursework Tasks &amp; Assignments — Lingo Student Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <link rel="stylesheet" href="assets/css/student.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body>
+  <!-- Student Navbar -->
+  <header class="student-navbar">
+    <div class="student-navbar-inner">
+      <a href="dashboard.html" class="student-brand">
+        <div class="student-brand-logo"><i class="fa-solid fa-graduation-cap"></i></div>
+        <span>Lingo Student</span>
+      </a>
+
+      <nav class="student-nav-links">
+        <a href="dashboard.html" class="student-nav-link"><i class="fa-solid fa-house"></i> <span data-i18n="Dashboard">Dashboard</span></a>
+        <a href="levels.html" class="student-nav-link"><i class="fa-solid fa-layer-group"></i> <span data-i18n="My Levels">My Levels</span></a>
+        <a href="lessons.html" class="student-nav-link"><i class="fa-solid fa-book-open"></i> <span data-i18n="Lessons">Lessons</span></a>
+        <a href="exams.html" class="student-nav-link"><i class="fa-solid fa-file-signature"></i> <span data-i18n="Exams">Exams</span></a>
+        <a href="tasks.html" class="student-nav-link active"><i class="fa-solid fa-list-check"></i> <span data-i18n="Tasks">Tasks</span></a>
+        <a href="profile.html" class="student-nav-link"><i class="fa-solid fa-chart-pie"></i> <span data-i18n="My Profile">My Progress</span></a>
+      </nav>
+
+      <div class="d-flex align-center gap-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-action="toggle-lang">
+          <i class="fa-solid fa-language"></i> <span data-lang-toggleLabel>عربي</span>
+        </button>
+        <div class="avatar avatar-sm" data-student-avatar>ST</div>
+        <button type="button" class="btn btn-outline-danger btn-sm" data-action="logout">
+          <i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="Logout">Logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="student-container">
+    <div class="d-flex justify-between align-center flex-wrap gap-3 mb-4">
+      <div>
+        <h1 style="font-size:1.5rem;" data-i18n="Tasks">Coursework Tasks &amp; Assignments</h1>
+        <p class="text-muted text-sm">Complete practice tasks and assignments for your accessible levels and review teacher feedback.</p>
+      </div>
+      <div class="d-flex align-center gap-2">
+        <select id="stu-task-level-filter" class="form-select" style="width:auto;min-width:190px;">
+          <option value="">All My Assigned Levels</option>
+        </select>
+        <select id="stu-task-status-filter" class="form-select" style="width:auto;min-width:170px;">
+          <option value="">All Task Statuses</option>
+          <option value="PENDING">Pending</option>
+          <option value="IN_PROGRESS">Draft Saved</option>
+          <option value="SUBMITTED">Submitted</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Tasks Cards Grid -->
+    <div id="student-tasks-grid" class="levels-grid mb-6">
+      <div class="card" style="grid-column:1/-1;">
+        <div class="loading-state">
+          <span class="spinner"></span>
+          <p class="mt-2">Loading your assigned tasks...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submitted Tasks & Teacher Feedback Table -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-comment-dots text-primary"></i> My Task Submissions &amp; Teacher Feedback</h3>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Task Name</th>
+              <th>Level / Lesson</th>
+              <th>Submitted Date</th>
+              <th>Score</th>
+              <th>Percentage</th>
+              <th>Grading Status</th>
+              <th>Teacher Feedback</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="student-task-history-tbody">
+            <tr><td colspan="8" class="text-center text-muted">Loading submission history...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/helpers.js"></script>
+  <script>
+    (async function() {
+      const session = await window.Auth.requireStudent();
+      if (!session) return;
+
+      const esc = window.Helpers.escapeHtml;
+      let myLevels = [];
+      let myTasks = [];
+
+      const gridEl = document.getElementById('student-tasks-grid');
+      const historyTbody = document.getElementById('student-task-history-tbody');
+      const levelFilter = document.getElementById('stu-task-level-filter');
+      const statusFilter = document.getElementById('stu-task-status-filter');
+
+      async function loadTasksPage() {
+        try {
+          const res = await Promise.all([
+            window.API.getLevels(),
+            window.API.getTasks(),
+            window.API.getStudentTaskHistory()
+          ]);
+          myLevels = res[0] || [];
+          myTasks = res[1] || [];
+          const history = res[2] || [];
+
+          levelFilter.innerHTML = `<option value="">All My Assigned Levels</option>` +
+            myLevels.map(function(l) {
+              return `<option value="${esc(l.Level_ID)}">${esc(l.Level_Name)}</option>`;
+            }).join('');
+
+          renderTasksGrid();
+          renderHistory(history);
+        } catch (err) {
+          gridEl.innerHTML = `<div class="card" style="grid-column:1/-1;"><div class="empty-state"><p class="text-danger">${esc(err.message)}</p></div></div>`;
+        }
+      }
+
+      function renderTasksGrid() {
+        const lvl = levelFilter.value;
+        const st = statusFilter.value;
+
+        const filtered = myTasks.filter(function(tk) {
+          if (lvl && String(tk.Level_ID) !== lvl) return false;
+          if (st && String(tk.Student_Status).toUpperCase() !== st) return false;
+          return true;
+        });
+
+        if (filtered.length === 0) {
+          gridEl.innerHTML = `
+            <div class="card" style="grid-column:1/-1;">
+              <div class="empty-state">
+                <div class="empty-state-icon"><i class="fa-solid fa-list-check"></i></div>
+                <h3>No Matching Tasks Found</h3>
+                <p>No coursework tasks match the current filter selection.</p>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        gridEl.innerHTML = filtered.map(function(tk) {
+          const sub = tk.Student_Submission;
+          const isSubmitted = tk.Student_Status === 'SUBMITTED';
+
+          return `
+            <div class="level-card">
+              <div class="level-card-banner" style="background:${esc(tk.Level_Color || '#0ea5e9')};"></div>
+              <div class="level-card-body">
+                <div class="d-flex justify-between align-start gap-2 mb-2">
+                  <div>
+                    <span class="badge badge-primary mb-1">${esc(tk.Level_Name)}</span>
+                    ${tk.Lesson_Title ? `<span class="badge badge-secondary mb-1">${esc(tk.Lesson_Title)}</span>` : ''}
+                    <h3 style="font-size:1.15rem;">${esc(tk.Task_Title)}</h3>
+                  </div>
+                  ${window.Helpers.renderStatusBadge(tk.Student_Status || 'PENDING')}
+                </div>
+
+                <div class="level-stats-grid" style="padding-top:0.75rem;">
+                  <div class="level-stat-pill">
+                    <i class="fa-solid fa-tag"></i>
+                    <div><span>Category</span><strong>${esc((tk.Task_Type || 'practice').toUpperCase())}</strong></div>
+                  </div>
+                  <div class="level-stat-pill">
+                    <i class="fa-solid fa-star"></i>
+                    <div><span>Max Score</span><strong>${tk.Max_Score} pts</strong></div>
+                  </div>
+                  <div class="level-stat-pill" style="grid-column: 1 / -1;">
+                    <i class="fa-regular fa-calendar"></i>
+                    <div><span>Deadline</span><strong>${tk.Deadline ? window.Helpers.formatDateTime(tk.Deadline) : 'Flexible / No Deadline'}</strong></div>
+                  </div>
+                </div>
+
+                ${sub && isSubmitted ? `
+                  <div class="mt-3 p-2" style="background:var(--bg-muted);border-radius:8px;padding:0.65rem 0.85rem;font-size:0.82rem;">
+                    <div class="d-flex justify-between">
+                      <span>Grade (${esc(sub.Grading_Status)}):</span>
+                      <strong class="text-primary">${sub.Score} / ${sub.Total_Marks} (${sub.Percentage}%)</strong>
+                    </div>
+                    ${sub.Teacher_Feedback ? `<div class="mt-1 text-secondary"><strong>Feedback:</strong> ${esc(sub.Teacher_Feedback)}</div>` : ''}
+                  </div>
+                ` : ''}
+              </div>
+
+              <div class="card-footer">
+                <code class="text-xs text-muted">${esc(tk.Task_ID)}</code>
+                <a href="task-player.html?taskId=${encodeURIComponent(tk.Task_ID)}" class="btn ${isSubmitted ? 'btn-secondary' : 'btn-primary'} btn-sm">
+                  <i class="fa-solid ${isSubmitted ? 'fa-eye' : 'fa-pen-to-square'}"></i>
+                  ${isSubmitted ? 'View Submission & Feedback' : (tk.Student_Status === 'IN_PROGRESS' ? 'Continue Saved Draft' : 'Start Task')}
+                </a>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderHistory(history) {
+        if (!history || history.length === 0) {
+          historyTbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted" style="padding:1.75rem;">You have not submitted any tasks yet.</td></tr>`;
+          return;
+        }
+        historyTbody.innerHTML = history.map(function(sub) {
+          return `
+            <tr>
+              <td><strong>${esc(sub.Task_Title)}</strong></td>
+              <td>
+                <span class="badge badge-primary">${esc(sub.Level_Name || sub.Level_ID)}</span>
+                ${sub.Lesson_Title ? `<div class="text-xs text-muted">${esc(sub.Lesson_Title)}</div>` : ''}
+              </td>
+              <td class="text-sm text-muted">${window.Helpers.formatDateTime(sub.Submission_Date)}</td>
+              <td>${sub.Score} / ${sub.Total_Marks}</td>
+              <td><strong>${sub.Percentage}%</strong></td>
+              <td>${window.Helpers.renderStatusBadge(sub.Grading_Status)}</td>
+              <td class="text-sm text-secondary">${esc(sub.Teacher_Feedback || '—')}</td>
+              <td>
+                <a href="task-player.html?taskId=${encodeURIComponent(sub.Task_ID)}" class="btn btn-secondary btn-sm">
+                  <i class="fa-solid fa-eye"></i> Review
+                </a>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      levelFilter.addEventListener('change', renderTasksGrid);
+      statusFilter.addEventListener('change', renderTasksGrid);
+      loadTasksPage();
+    })();
+  </script>
+</body>
+</html>

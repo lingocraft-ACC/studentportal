@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="lingoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="100%" stop-color="#7c3aed" />
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="28" fill="url(#lingoGrad)" />
+  <path d="M60 28L18 48L60 68L94 51.8V76H102V48L60 28ZM34 61.6V77.6C34 86.4 45.6 94 60 94C74.4 94 86 86.4 86 77.6V61.6L60 74L34 61.6Z" fill="#ffffff" />
+</svg>

@@ -1,0 +1,317 @@
+﻿<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Examinations — Lingo Student Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <link rel="stylesheet" href="assets/css/student.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body>
+  <!-- Student Navbar -->
+  <header class="student-navbar">
+    <div class="student-navbar-inner">
+      <a href="dashboard.html" class="student-brand">
+        <div class="student-brand-logo"><i class="fa-solid fa-graduation-cap"></i></div>
+        <span>Lingo Student</span>
+      </a>
+
+      <nav class="student-nav-links">
+        <a href="dashboard.html" class="student-nav-link"><i class="fa-solid fa-house"></i> <span data-i18n="Dashboard">Dashboard</span></a>
+        <a href="levels.html" class="student-nav-link"><i class="fa-solid fa-layer-group"></i> <span data-i18n="My Levels">My Levels</span></a>
+        <a href="lessons.html" class="student-nav-link"><i class="fa-solid fa-book-open"></i> <span data-i18n="Lessons">Lessons</span></a>
+        <a href="exams.html" class="student-nav-link active"><i class="fa-solid fa-file-signature"></i> <span data-i18n="Exams">Exams</span></a>
+        <a href="tasks.html" class="student-nav-link"><i class="fa-solid fa-list-check"></i> <span data-i18n="Tasks">Tasks</span></a>
+        <a href="profile.html" class="student-nav-link"><i class="fa-solid fa-chart-pie"></i> <span data-i18n="My Profile">My Progress</span></a>
+      </nav>
+
+      <div class="d-flex align-center gap-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-action="toggle-lang">
+          <i class="fa-solid fa-language"></i> <span data-lang-toggleLabel>عربي</span>
+        </button>
+        <div class="avatar avatar-sm" data-student-avatar>ST</div>
+        <button type="button" class="btn btn-outline-danger btn-sm" data-action="logout">
+          <i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="Logout">Logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="student-container">
+    <div class="d-flex justify-between align-center flex-wrap gap-3 mb-4">
+      <div>
+        <h1 style="font-size:1.5rem;" data-i18n="Exams">Available Examinations</h1>
+        <p class="text-muted text-sm">Take official timed exams for your assigned levels and review your graded attempt history.</p>
+      </div>
+      <div class="d-flex align-center gap-2">
+        <select id="stu-exam-level-filter" class="form-select" style="width:auto;min-width:200px;">
+          <option value="">All My Assigned Levels</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Available Exams Cards Grid -->
+    <div id="student-exams-grid" class="levels-grid mb-6">
+      <div class="card" style="grid-column:1/-1;">
+        <div class="loading-state">
+          <span class="spinner"></span>
+          <p class="mt-2">Loading available examinations...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Past Exam Attempts History -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-clock-rotate-left text-primary"></i> My Submitted Exam Attempts History</h3>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Exam Title</th>
+              <th>Level</th>
+              <th>Attempt #</th>
+              <th>Submitted Date</th>
+              <th>Score</th>
+              <th>Percentage</th>
+              <th>Result</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="student-exam-history-tbody">
+            <tr><td colspan="8" class="text-center text-muted">Loading attempt history...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Attempt Result Review Modal -->
+  <div class="modal-backdrop" id="stu-attempt-review-modal">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa-solid fa-clipboard-check text-primary"></i> Exam Attempt Result &amp; Feedback</h3>
+        <button type="button" class="modal-close" data-close-review-modal>&times;</button>
+      </div>
+      <div class="modal-body" id="stu-attempt-review-body"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-review-modal>Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/helpers.js"></script>
+  <script>
+    (async function() {
+      const session = await window.Auth.requireStudent();
+      if (!session) return;
+
+      const esc = window.Helpers.escapeHtml;
+      let myExams = [];
+      let myLevels = [];
+
+      const gridEl = document.getElementById('student-exams-grid');
+      const historyTbody = document.getElementById('student-exam-history-tbody');
+      const levelFilter = document.getElementById('stu-exam-level-filter');
+
+      async function loadExamsPage() {
+        try {
+          const res = await Promise.all([
+            window.API.getLevels(),
+            window.API.getExams(),
+            window.API.getStudentExamHistory()
+          ]);
+          myLevels = res[0] || [];
+          myExams = res[1] || [];
+          const history = res[2] || [];
+
+          levelFilter.innerHTML = `<option value="">All My Assigned Levels</option>` +
+            myLevels.map(function(l) {
+              return `<option value="${esc(l.Level_ID)}">${esc(l.Level_Name)}</option>`;
+            }).join('');
+
+          renderExamsGrid();
+          renderHistoryTable(history);
+        } catch (err) {
+          gridEl.innerHTML = `<div class="card" style="grid-column:1/-1;"><div class="empty-state"><p class="text-danger">${esc(err.message)}</p></div></div>`;
+        }
+      }
+
+      function renderExamsGrid() {
+        const lvl = levelFilter.value;
+        const filtered = myExams.filter(function(ex) {
+          if (lvl && String(ex.Level_ID) !== lvl) return false;
+          return true;
+        });
+
+        if (filtered.length === 0) {
+          gridEl.innerHTML = `
+            <div class="card" style="grid-column:1/-1;">
+              <div class="empty-state">
+                <div class="empty-state-icon"><i class="fa-solid fa-file-signature"></i></div>
+                <h3>No Exams Available</h3>
+                <p>There are currently no active examinations in the selected level.</p>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        gridEl.innerHTML = filtered.map(function(ex) {
+          const canStart = Boolean(ex.Can_Start);
+          const inProg = Boolean(ex.Active_Attempt_ID);
+
+          return `
+            <div class="level-card">
+              <div class="level-card-banner" style="background:${esc(ex.Level_Color || '#4f46e5')};"></div>
+              <div class="level-card-body">
+                <div class="d-flex justify-between align-start gap-2 mb-2">
+                  <div>
+                    <span class="badge badge-primary mb-1">${esc(ex.Level_Name)}</span>
+                    ${ex.Lesson_Title ? `<span class="badge badge-secondary mb-1">${esc(ex.Lesson_Title)}</span>` : ''}
+                    <h3 style="font-size:1.15rem;">${esc(ex.Exam_Title)}</h3>
+                  </div>
+                  ${window.Helpers.renderStatusBadge(ex.Student_Availability || 'AVAILABLE')}
+                </div>
+
+                <div class="level-stats-grid" style="padding-top:0.75rem;">
+                  <div class="level-stat-pill">
+                    <i class="fa-regular fa-clock"></i>
+                    <div><span>Duration</span><strong>${ex.Duration} mins</strong></div>
+                  </div>
+                  <div class="level-stat-pill">
+                    <i class="fa-solid fa-star"></i>
+                    <div><span>Total Marks</span><strong>${ex.Total_Marks}</strong></div>
+                  </div>
+                  <div class="level-stat-pill">
+                    <i class="fa-solid fa-flag-checkered"></i>
+                    <div><span>Pass Score</span><strong>${ex.Passing_Score}%</strong></div>
+                  </div>
+                  <div class="level-stat-pill">
+                    <i class="fa-solid fa-rotate"></i>
+                    <div><span>Attempts</span><strong>${ex.Student_Attempts_Count || 0} / ${ex.Max_Attempts}</strong></div>
+                  </div>
+                </div>
+
+                ${ex.Best_Percentage !== null && ex.Best_Percentage !== undefined ? `
+                  <div class="mt-3 p-2" style="background:var(--bg-muted);border-radius:8px;padding:0.5rem 0.75rem;font-size:0.82rem;display:flex;justify-content:space-between;">
+                    <span>Best Score Achieved:</span>
+                    <strong class="text-primary">${ex.Best_Score} / ${ex.Total_Marks} (${ex.Best_Percentage}%)</strong>
+                  </div>
+                ` : ''}
+              </div>
+
+              <div class="card-footer">
+                <span class="text-xs text-muted">${esc(ex.Availability_Message || '')}</span>
+                ${canStart ? `
+                  <a href="exam-player.html?examId=${encodeURIComponent(ex.Exam_ID)}" class="btn ${inProg ? 'btn-warning' : 'btn-primary'} btn-sm">
+                    <i class="fa-solid ${inProg ? 'fa-play' : 'fa-pen-to-square'}"></i>
+                    ${inProg ? 'Resume In-Progress Exam' : 'Start Exam'}
+                  </a>
+                ` : `
+                  <button type="button" class="btn btn-secondary btn-sm" disabled>
+                    <i class="fa-solid fa-lock"></i> ${ex.Remaining_Attempts <= 0 ? 'Max Attempts Reached' : 'Unavailable'}
+                  </button>
+                `}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderHistoryTable(history) {
+        if (!history || history.length === 0) {
+          historyTbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted" style="padding:1.75rem;">You have not submitted any exams yet.</td></tr>`;
+          return;
+        }
+        historyTbody.innerHTML = history.map(function(att) {
+          return `
+            <tr>
+              <td><strong>${esc(att.Exam_Title)}</strong></td>
+              <td><span class="badge badge-primary">${esc(att.Level_Name || att.Level_ID)}</span></td>
+              <td>#${att.Attempt_Number}</td>
+              <td class="text-sm text-muted">${window.Helpers.formatDateTime(att.Submit_Time)}</td>
+              <td>${att.Score} / ${att.Total_Marks}</td>
+              <td><strong>${att.Percentage}%</strong></td>
+              <td>${window.Helpers.renderStatusBadge(att.Result_Status)}</td>
+              <td>
+                <button type="button" class="btn btn-secondary btn-sm" data-review-attempt="${esc(att.Attempt_ID)}">
+                  <i class="fa-solid fa-eye"></i> View Result
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        historyTbody.querySelectorAll('[data-review-attempt]').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            openAttemptReview(btn.getAttribute('data-review-attempt'));
+          });
+        });
+      }
+
+      const reviewModal = document.getElementById('stu-attempt-review-modal');
+      const reviewBody = document.getElementById('stu-attempt-review-body');
+      document.querySelectorAll('[data-close-review-modal]').forEach(function(b) {
+        b.addEventListener('click', function() { reviewModal.classList.remove('active'); });
+      });
+
+      async function openAttemptReview(attemptId) {
+        reviewBody.innerHTML = `<div class="loading-state"><span class="spinner"></span></div>`;
+        reviewModal.classList.add('active');
+        try {
+          const detail = await window.API.getExamResults({ attemptId: attemptId });
+          const breakdown = (detail.Details && detail.Details.breakdown) || [];
+          const st = String(detail.Result_Status).toUpperCase();
+          const circleClass = st === 'PASSED' ? 'passed' : (st === 'FAILED' ? 'failed' : 'pending');
+
+          reviewBody.innerHTML = `
+            <div class="text-center mb-4">
+              <div class="result-score-circle ${circleClass}">
+                <strong style="font-size:1.85rem;">${detail.Percentage}%</strong>
+                <span class="text-xs font-bold">${detail.Score} / ${detail.Total_Marks}</span>
+              </div>
+              <h3>${esc(detail.Exam_Title)} — Attempt #${detail.Attempt_Number}</h3>
+              <div class="mt-1">${window.Helpers.renderStatusBadge(detail.Result_Status)}</div>
+              ${detail.Details && detail.Details.teacher_feedback ? `
+                <div class="mt-3 p-3" style="background:var(--primary-light);color:var(--primary);border-radius:10px;">
+                  <strong>Instructor Feedback:</strong> ${esc(detail.Details.teacher_feedback)}
+                </div>
+              ` : ''}
+            </div>
+
+            ${detail.Allow_Review && breakdown.length > 0 ? `
+              <h4 class="font-bold mb-2">Question-by-Question Review</h4>
+              ${breakdown.map(function(item, idx) {
+                const badgeColor = item.status === 'CORRECT' ? 'badge-success' : (item.status === 'PARTIAL' ? 'badge-warning' : (item.status === 'PENDING_REVIEW' ? 'badge-info' : 'badge-danger'));
+                return `
+                  <div style="padding:1rem;border:1px solid var(--border-color);border-radius:10px;margin-bottom:0.75rem;background:var(--bg-body);">
+                    <div class="d-flex justify-between align-center mb-1">
+                      <strong>Q${idx + 1}: ${esc(item.text)}</strong>
+                      <span class="badge ${badgeColor}">${item.earned_points} / ${item.points} pts (${esc(item.status)})</span>
+                    </div>
+                    <div class="text-sm"><strong>Your Answer:</strong> <code>${esc(JSON.stringify(item.student_answer))}</code></div>
+                    <div class="text-sm text-success"><strong>Correct Answer:</strong> <code>${esc(JSON.stringify(item.correct_answer))}</code></div>
+                    ${item.explanation ? `<div class="text-xs text-secondary mt-1"><i class="fa-solid fa-lightbulb text-warning"></i> <strong>Explanation:</strong> ${esc(item.explanation)}</div>` : ''}
+                  </div>
+                `;
+              }).join('')}
+            ` : '<p class="text-muted text-center">Detailed answer key review is disabled by administrator settings.</p>'}
+          `;
+        } catch (err) {
+          reviewBody.innerHTML = `<p class="text-danger">${esc(err.message)}</p>`;
+        }
+      }
+
+      levelFilter.addEventListener('change', renderExamsGrid);
+      loadExamsPage();
+    })();
+  </script>
+</body>
+</html>

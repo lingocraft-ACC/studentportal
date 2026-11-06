@@ -1,0 +1,662 @@
+﻿<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Examination — Lingo Student Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <link rel="stylesheet" href="assets/css/student.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body>
+  <!-- Sticky Exam Top Bar -->
+  <header class="exam-player-header">
+    <div class="d-flex align-center gap-3">
+      <div class="student-brand-logo"><i class="fa-solid fa-file-signature"></i></div>
+      <div>
+        <h1 style="font-size:1.1rem;color:#fff;margin:0;" id="player-exam-title">Loading Examination...</h1>
+        <span class="text-xs" style="color:#94a3b8;" id="player-exam-subtitle">Verifying eligibility and initializing attempt...</span>
+      </div>
+    </div>
+
+    <div class="d-flex align-center gap-3">
+      <span class="text-xs" style="color:#cbd5e1;" id="autosave-status-indicator">
+        <i class="fa-solid fa-cloud-check text-success"></i> Auto-Save Active
+      </span>
+      <div class="exam-timer-box" id="exam-countdown-box">
+        <i class="fa-regular fa-clock"></i>
+        <span id="exam-countdown-text">--:--</span>
+      </div>
+      <button type="button" class="btn btn-success btn-sm" id="top-submit-exam-btn" disabled>
+        <i class="fa-solid fa-paper-plane"></i> Submit Exam
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Exam Stage -->
+  <main id="exam-active-workspace" class="exam-player-grid">
+    <!-- Left Column: Active Question Stage -->
+    <div id="question-stage-mount">
+      <div class="question-stage-card">
+        <div class="loading-state">
+          <span class="spinner"></span>
+          <p class="mt-2">Starting secure examination session...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Progress & Question Palette Navigator -->
+    <aside class="card" id="exam-navigator-card">
+      <div class="card-header">
+        <h3 class="card-title" style="font-size:0.95rem;"><i class="fa-solid fa-compass text-primary"></i> Question Navigator</h3>
+      </div>
+      <div class="card-body">
+        <div class="d-flex justify-between text-xs font-bold mb-1">
+          <span>Completion Progress</span>
+          <span id="palette-progress-text">0 / 0 Answered</span>
+        </div>
+        <div class="progress-bar-wrap mb-4">
+          <div class="progress-bar-fill" id="palette-progress-bar" style="width:0%;"></div>
+        </div>
+
+        <div class="question-palette-grid mb-4" id="question-palette-mount"></div>
+
+        <div class="d-flex flex-column gap-1 text-xs text-muted mb-4" style="border-top:1px solid var(--border-color);padding-top:0.85rem;">
+          <div><span style="display:inline-block;width:10px;height:10px;background:var(--success);border-radius:3px;margin-inline-end:6px;"></span> Answered</div>
+          <div><span style="display:inline-block;width:10px;height:10px;border:2px solid var(--primary);border-radius:3px;margin-inline-end:6px;"></span> Current Question</div>
+          <div><span style="display:inline-block;width:10px;height:10px;background:var(--warning);border-radius:50%;margin-inline-end:6px;"></span> Flagged for Review</div>
+        </div>
+
+        <button type="button" class="btn btn-secondary btn-sm w-100 mb-2" id="manual-save-progress-btn">
+          <i class="fa-solid fa-floppy-disk"></i> Save Answers Now
+        </button>
+        <button type="button" class="btn btn-primary w-100" id="sidebar-submit-exam-btn" disabled>
+          <i class="fa-solid fa-paper-plane"></i> Finalize &amp; Submit Exam
+        </button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Post-Submission Result View -->
+  <section id="exam-result-workspace" class="student-container d-none"></section>
+
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/helpers.js"></script>
+  <script>
+    (async function() {
+      const session = await window.Auth.requireStudent();
+      if (!session) return;
+
+      const esc = window.Helpers.escapeHtml;
+      const examId = window.Helpers.getQueryParam('examId');
+      if (!examId) {
+        window.location.href = 'exams.html';
+        return;
+      }
+
+      let attemptId = null;
+      let examData = null;
+      let questions = [];
+      let currentIdx = 0;
+      let studentAnswers = {};
+      let flaggedIds = [];
+      let remainingSeconds = 0;
+      let timerInterval = null;
+      let autoSaveTimeout = null;
+      let isSubmitting = false;
+      let isSubmitted = false;
+
+      const stageMount = document.getElementById('question-stage-mount');
+      const paletteMount = document.getElementById('question-palette-mount');
+      const countdownBox = document.getElementById('exam-countdown-box');
+      const countdownText = document.getElementById('exam-countdown-text');
+      const autosaveIndicator = document.getElementById('autosave-status-indicator');
+      const topSubmitBtn = document.getElementById('top-submit-exam-btn');
+      const sideSubmitBtn = document.getElementById('sidebar-submit-exam-btn');
+
+      async function initExamSession() {
+        try {
+          const started = await window.API.startExam({ examId: examId });
+          attemptId = started.attemptId;
+          examData = started.exam || {};
+          questions = Array.isArray(examData.questions) ? examData.questions : [];
+          studentAnswers = started.savedAnswers || {};
+          flaggedIds = Array.isArray(started.flaggedQuestions) ? started.flaggedQuestions : [];
+          remainingSeconds = Number(started.remainingSeconds || (Number(examData.Duration || 30) * 60));
+
+          // Initialize ordering default arrays if not yet answered
+          questions.forEach(function(q) {
+            if (q.type === 'ordering' && !studentAnswers[q.question_id]) {
+              studentAnswers[q.question_id] = (q.ordering_items || []).slice();
+            }
+          });
+
+          document.getElementById('player-exam-title').textContent = examData.Exam_Title || 'Examination';
+          document.getElementById('player-exam-subtitle').textContent =
+            'Attempt #' + (started.attemptNumber || 1) + ' • Total Marks: ' + (examData.Total_Marks || 100) + ' • Passing: ' + (examData.Passing_Score || 50) + '%';
+
+          topSubmitBtn.disabled = false;
+          sideSubmitBtn.disabled = false;
+
+          renderCurrentQuestion();
+          renderPalette();
+          startCountdownTimer();
+
+          if (started.resumed) {
+            window.Helpers.showToast('Resumed your in-progress attempt with saved answers.', 'info');
+          }
+        } catch (err) {
+          stageMount.innerHTML = `
+            <div class="question-stage-card">
+              <div class="empty-state">
+                <div class="empty-state-icon"><i class="fa-solid fa-lock text-danger"></i></div>
+                <h3>Unable to Start Examination</h3>
+                <p class="text-danger">${esc(err.message)}</p>
+                <a href="exams.html" class="btn btn-primary"><i class="fa-solid fa-arrow-left"></i> Return to Exams</a>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      function startCountdownTimer() {
+        updateTimerDisplay();
+        timerInterval = setInterval(function() {
+          if (isSubmitted) {
+            clearInterval(timerInterval);
+            return;
+          }
+          remainingSeconds--;
+          updateTimerDisplay();
+          if (remainingSeconds <= 0) {
+            clearInterval(timerInterval);
+            window.Helpers.showToast('Time has expired! Automatically submitting your examination...', 'warning');
+            performFinalSubmission(true);
+          }
+        }, 1000);
+      }
+
+      function updateTimerDisplay() {
+        countdownText.textContent = window.Helpers.formatTimer(remainingSeconds);
+        countdownBox.classList.remove('warning', 'danger');
+        if (remainingSeconds <= 60) {
+          countdownBox.classList.add('danger');
+        } else if (remainingSeconds <= 300) {
+          countdownBox.classList.add('warning');
+        }
+      }
+
+      function isQuestionAnswered(q) {
+        const val = studentAnswers[q.question_id];
+        if (val === undefined || val === null || val === '') return false;
+        if (Array.isArray(val)) return val.length > 0 && val.some(function(x) { return String(x).trim() !== ''; });
+        if (typeof val === 'object') return Object.keys(val).length > 0;
+        return true;
+      }
+
+      function scheduleAutoSave() {
+        if (isSubmitted || !attemptId) return;
+        autosaveIndicator.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> Saving...';
+        if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+        autoSaveTimeout = setTimeout(async function() {
+          try {
+            await window.API.saveExamAnswers({
+              attemptId: attemptId,
+              answers: studentAnswers,
+              flaggedQuestions: flaggedIds
+            });
+            autosaveIndicator.innerHTML = '<i class="fa-solid fa-cloud-check text-success"></i> Saved';
+          } catch (e) {
+            autosaveIndicator.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-warning"></i> Local Saved';
+          }
+        }, 1800);
+      }
+
+      function renderPalette() {
+        let answeredCount = 0;
+        paletteMount.innerHTML = questions.map(function(q, idx) {
+          const answered = isQuestionAnswered(q);
+          if (answered) answeredCount++;
+          const isCurrent = idx === currentIdx;
+          const isFlagged = flaggedIds.indexOf(q.question_id) !== -1;
+
+          return `
+            <button type="button" class="palette-btn ${isCurrent ? 'current' : ''} ${answered ? 'answered' : ''} ${isFlagged ? 'flagged' : ''}" data-jump-idx="${idx}">
+              ${idx + 1}
+            </button>
+          `;
+        }).join('');
+
+        const total = questions.length;
+        const pct = total > 0 ? Math.round((answeredCount / total) * 100) : 0;
+        document.getElementById('palette-progress-text').textContent = answeredCount + ' / ' + total + ' Answered';
+        document.getElementById('palette-progress-bar').style.width = pct + '%';
+
+        paletteMount.querySelectorAll('[data-jump-idx]').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            currentIdx = Number(btn.getAttribute('data-jump-idx'));
+            renderCurrentQuestion();
+            renderPalette();
+          });
+        });
+      }
+
+      function renderAnswerControlHtml(q) {
+        const qId = q.question_id;
+        const currentAns = studentAnswers[qId];
+
+        if (q.type === 'multiple_choice_single' || q.type === 'true_false') {
+          const opts = Array.isArray(q.options) ? q.options : [];
+          return `
+            <div class="answer-options-list">
+              ${opts.map(function(opt) {
+                const selected = String(currentAns) === String(opt.option_id);
+                return `
+                  <div class="answer-option-item ${selected ? 'selected' : ''}" data-select-single="${esc(opt.option_id)}">
+                    <div class="option-key-badge">${esc(opt.option_id)}</div>
+                    <div style="font-size:1rem;font-weight:500;">${esc(opt.text)}</div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        if (q.type === 'multiple_choice_multiple') {
+          const opts = Array.isArray(q.options) ? q.options : [];
+          const selArr = Array.isArray(currentAns) ? currentAns.map(String) : [];
+          return `
+            <div class="text-xs text-muted mb-2"><i class="fa-solid fa-check-double"></i> Select all correct options:</div>
+            <div class="answer-options-list">
+              ${opts.map(function(opt) {
+                const selected = selArr.indexOf(String(opt.option_id)) !== -1;
+                return `
+                  <div class="answer-option-item ${selected ? 'selected' : ''}" data-toggle-multi="${esc(opt.option_id)}">
+                    <div class="option-key-badge">${selected ? '<i class="fa-solid fa-check"></i>' : esc(opt.option_id)}</div>
+                    <div style="font-size:1rem;font-weight:500;">${esc(opt.text)}</div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        if (q.type === 'short_answer') {
+          return `
+            <div class="form-group">
+              <label class="form-label">Your Short Answer:</label>
+              <input type="text" id="text-ans-input" class="form-control" style="font-size:1.05rem;padding:0.85rem;" value="${esc(currentAns || '')}" placeholder="Type your concise answer here...">
+            </div>
+          `;
+        }
+
+        if (q.type === 'fill_in_the_blanks') {
+          const blankMatches = String(q.text || '').match(/_{2,}/g) || ['_____'];
+          const count = Math.max(1, blankMatches.length);
+          const arr = Array.isArray(currentAns) ? currentAns : (currentAns ? [currentAns] : []);
+          let html = `<div class="d-flex flex-column gap-3">`;
+          for (let b = 0; b < count; b++) {
+            html += `
+              <div class="d-flex align-center gap-3">
+                <span class="badge badge-primary" style="min-width:85px;justify-content:center;">Blank #${b + 1}</span>
+                <input type="text" class="form-control blank-slot-input" data-blank-idx="${b}" value="${esc(arr[b] || '')}" placeholder="Enter missing word/phrase for Blank #${b + 1}...">
+              </div>
+            `;
+          }
+          html += `</div>`;
+          return html;
+        }
+
+        if (q.type === 'matching') {
+          const prompts = q.matching_prompts || [];
+          const choices = q.matching_choices || [];
+          const ansMap = (currentAns && typeof currentAns === 'object' && !Array.isArray(currentAns)) ? currentAns : {};
+          return `
+            <div class="d-flex flex-column gap-3">
+              ${prompts.map(function(p) {
+                const selectedVal = ansMap[p.id] || '';
+                return `
+                  <div class="form-row align-center" style="padding:0.85rem;background:var(--bg-body);border:1px solid var(--border-color);border-radius:10px;">
+                    <div class="font-semibold">${esc(p.left)}</div>
+                    <select class="form-select matching-select-input" data-match-key="${esc(p.id)}">
+                      <option value="">-- Choose Matching Item --</option>
+                      ${choices.map(function(ch) {
+                        return `<option value="${esc(ch)}" ${selectedVal === ch ? 'selected' : ''}>${esc(ch)}</option>`;
+                      }).join('')}
+                    </select>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        if (q.type === 'ordering') {
+          const seq = Array.isArray(currentAns) && currentAns.length > 0
+            ? currentAns
+            : (q.ordering_items || []);
+          return `
+            <div class="text-xs text-muted mb-2">Use the Up and Down buttons to arrange the items in the correct order:</div>
+            <div id="ordering-list-container">
+              ${seq.map(function(itemText, sIdx) {
+                return `
+                  <div class="ordering-item-row">
+                    <div class="d-flex align-center gap-3">
+                      <span class="badge badge-primary">#${sIdx + 1}</span>
+                      <span class="font-semibold">${esc(itemText)}</span>
+                    </div>
+                    <div class="d-flex gap-1">
+                      <button type="button" class="btn btn-icon btn-secondary btn-sm" data-order-up="${sIdx}" ${sIdx === 0 ? 'disabled' : ''}><i class="fa-solid fa-arrow-up"></i></button>
+                      <button type="button" class="btn btn-icon btn-secondary btn-sm" data-order-down="${sIdx}" ${sIdx === seq.length - 1 ? 'disabled' : ''}><i class="fa-solid fa-arrow-down"></i></button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        if (q.type === 'essay') {
+          return `
+            <div class="form-group">
+              <label class="form-label">Your Essay Response:</label>
+              <textarea id="essay-ans-input" class="form-control" rows="7" placeholder="Write your detailed response here...">${esc(currentAns || '')}</textarea>
+            </div>
+          `;
+        }
+
+        return '';
+      }
+
+      function renderCurrentQuestion() {
+        if (questions.length === 0) return;
+        const q = questions[currentIdx];
+        const qId = q.question_id;
+        const isFlagged = flaggedIds.indexOf(qId) !== -1;
+        const media = q.media || {};
+
+        stageMount.innerHTML = `
+          <div class="question-stage-card">
+            <div class="question-stage-top">
+              <div class="d-flex align-center gap-2">
+                <span class="badge badge-primary" style="font-size:0.85rem;">Question ${currentIdx + 1} of ${questions.length}</span>
+                <span class="badge badge-secondary">${q.points} Points</span>
+              </div>
+              <button type="button" class="btn ${isFlagged ? 'btn-warning' : 'btn-secondary'} btn-sm" id="toggle-flag-btn">
+                <i class="fa-solid fa-flag"></i> ${isFlagged ? 'Flagged for Review' : 'Flag Question'}
+              </button>
+            </div>
+
+            <div class="question-prompt-text">${esc(q.text)}</div>
+
+            <!-- Question Media Showcase -->
+            ${(media.image || media.audio || media.video) ? `
+              <div class="question-media-showcase">
+                ${media.image && media.image.url ? `<img src="${esc(media.image.url)}" alt="Question Figure">` : ''}
+                ${media.audio && media.audio.url ? `<audio controls src="${esc(media.audio.url)}" class="w-100"></audio>` : ''}
+                ${media.video && media.video.url ? `<video controls src="${esc(media.video.url)}" style="max-height:340px;width:100%;border-radius:10px;"></video>` : ''}
+              </div>
+            ` : ''}
+
+            ${renderAnswerControlHtml(q)}
+
+            <!-- Bottom Navigation -->
+            <div class="d-flex justify-between align-center mt-6 pt-4" style="border-top:1px solid var(--border-color);">
+              <button type="button" class="btn btn-secondary" id="prev-question-btn" ${currentIdx === 0 ? 'disabled' : ''}>
+                <i class="fa-solid fa-arrow-left"></i> Previous Question
+              </button>
+
+              ${currentIdx < questions.length - 1 ? `
+                <button type="button" class="btn btn-primary" id="next-question-btn">
+                  Next Question <i class="fa-solid fa-arrow-right"></i>
+                </button>
+              ` : `
+                <button type="button" class="btn btn-success" id="stage-finish-submit-btn">
+                  <i class="fa-solid fa-paper-plane"></i> Review &amp; Submit Exam
+                </button>
+              `}
+            </div>
+          </div>
+        `;
+
+        bindQuestionEvents(q);
+      }
+
+      function bindQuestionEvents(q) {
+        const qId = q.question_id;
+
+        document.getElementById('toggle-flag-btn').addEventListener('click', function() {
+          const pos = flaggedIds.indexOf(qId);
+          if (pos === -1) flaggedIds.push(qId);
+          else flaggedIds.splice(pos, 1);
+          renderCurrentQuestion();
+          renderPalette();
+          scheduleAutoSave();
+        });
+
+        stageMount.querySelectorAll('[data-select-single]').forEach(function(item) {
+          item.addEventListener('click', function() {
+            studentAnswers[qId] = item.getAttribute('data-select-single');
+            renderCurrentQuestion();
+            renderPalette();
+            scheduleAutoSave();
+          });
+        });
+
+        stageMount.querySelectorAll('[data-toggle-multi]').forEach(function(item) {
+          item.addEventListener('click', function() {
+            const optId = item.getAttribute('data-toggle-multi');
+            let arr = Array.isArray(studentAnswers[qId]) ? studentAnswers[qId].slice() : [];
+            const idx = arr.indexOf(optId);
+            if (idx === -1) arr.push(optId);
+            else arr.splice(idx, 1);
+            studentAnswers[qId] = arr;
+            renderCurrentQuestion();
+            renderPalette();
+            scheduleAutoSave();
+          });
+        });
+
+        const textInp = document.getElementById('text-ans-input');
+        if (textInp) {
+          textInp.addEventListener('input', function() {
+            studentAnswers[qId] = textInp.value;
+            renderPalette();
+            scheduleAutoSave();
+          });
+        }
+
+        const essayInp = document.getElementById('essay-ans-input');
+        if (essayInp) {
+          essayInp.addEventListener('input', function() {
+            studentAnswers[qId] = essayInp.value;
+            renderPalette();
+            scheduleAutoSave();
+          });
+        }
+
+        stageMount.querySelectorAll('.blank-slot-input').forEach(function(inp) {
+          inp.addEventListener('input', function() {
+            const allInps = Array.from(stageMount.querySelectorAll('.blank-slot-input'));
+            studentAnswers[qId] = allInps.map(function(el) { return el.value; });
+            renderPalette();
+            scheduleAutoSave();
+          });
+        });
+
+        stageMount.querySelectorAll('.matching-select-input').forEach(function(sel) {
+          sel.addEventListener('change', function() {
+            const map = Object.assign({}, studentAnswers[qId] || {});
+            const key = sel.getAttribute('data-match-key');
+            if (sel.value) map[key] = sel.value;
+            else delete map[key];
+            studentAnswers[qId] = map;
+            renderPalette();
+            scheduleAutoSave();
+          });
+        });
+
+        stageMount.querySelectorAll('[data-order-up], [data-order-down]').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            const isUp = btn.hasAttribute('data-order-up');
+            const idx = Number(btn.getAttribute(isUp ? 'data-order-up' : 'data-order-down'));
+            const swapIdx = isUp ? idx - 1 : idx + 1;
+            const seq = (studentAnswers[qId] || q.ordering_items || []).slice();
+            if (swapIdx < 0 || swapIdx >= seq.length) return;
+            const tmp = seq[idx];
+            seq[idx] = seq[swapIdx];
+            seq[swapIdx] = tmp;
+            studentAnswers[qId] = seq;
+            renderCurrentQuestion();
+            renderPalette();
+            scheduleAutoSave();
+          });
+        });
+
+        const prevBtn = document.getElementById('prev-question-btn');
+        if (prevBtn) {
+          prevBtn.addEventListener('click', function() {
+            if (currentIdx > 0) {
+              currentIdx--;
+              renderCurrentQuestion();
+              renderPalette();
+            }
+          });
+        }
+
+        const nextBtn = document.getElementById('next-question-btn');
+        if (nextBtn) {
+          nextBtn.addEventListener('click', function() {
+            if (currentIdx < questions.length - 1) {
+              currentIdx++;
+              renderCurrentQuestion();
+              renderPalette();
+            }
+          });
+        }
+
+        const finishBtn = document.getElementById('stage-finish-submit-btn');
+        if (finishBtn) {
+          finishBtn.addEventListener('click', confirmAndSubmitExam);
+        }
+      }
+
+      document.getElementById('manual-save-progress-btn').addEventListener('click', async function() {
+        if (!attemptId || isSubmitted) return;
+        try {
+          await window.API.saveExamAnswers({
+            attemptId: attemptId,
+            answers: studentAnswers,
+            flaggedQuestions: flaggedIds
+          });
+          window.Helpers.showToast('Your answers have been saved to the server.', 'success');
+        } catch (err) {
+          window.Helpers.showToast(err.message, 'error');
+        }
+      });
+
+      async function confirmAndSubmitExam() {
+        if (isSubmitting || isSubmitted) return;
+        const unansweredCount = questions.filter(function(q) { return !isQuestionAnswered(q); }).length;
+        let msg = 'Are you sure you want to submit your final answers for grading? You will not be able to change your answers after submitting.';
+        if (unansweredCount > 0) {
+          msg = 'Warning: You still have ' + unansweredCount + ' unanswered question(s). ' + msg;
+        }
+        const ok = await window.Helpers.confirmDialog({
+          title: 'Submit Final Examination',
+          message: msg,
+          confirmText: 'Submit Exam Now',
+          danger: false
+        });
+        if (ok) {
+          await performFinalSubmission(false);
+        }
+      }
+
+      async function performFinalSubmission(autoSubmitted) {
+        if (isSubmitting || isSubmitted) return;
+        isSubmitting = true;
+        if (timerInterval) clearInterval(timerInterval);
+
+        topSubmitBtn.disabled = true;
+        sideSubmitBtn.disabled = true;
+        topSubmitBtn.innerHTML = '<span class="spinner spinner-sm spinner-white"></span> Grading...';
+
+        try {
+          const result = await window.API.submitExam({
+            attemptId: attemptId,
+            answers: studentAnswers,
+            autoSubmitted: Boolean(autoSubmitted)
+          });
+          isSubmitted = true;
+          renderPostSubmissionResult(result);
+        } catch (err) {
+          isSubmitting = false;
+          topSubmitBtn.disabled = false;
+          sideSubmitBtn.disabled = false;
+          topSubmitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Exam';
+          window.Helpers.showToast('Submission error: ' + err.message, 'error');
+        }
+      }
+
+      function renderPostSubmissionResult(res) {
+        document.getElementById('exam-active-workspace').classList.add('d-none');
+        const resSec = document.getElementById('exam-result-workspace');
+        resSec.classList.remove('d-none');
+
+        const st = String(res.resultStatus).toUpperCase();
+        const circleClass = st === 'PASSED' ? 'passed' : (st === 'FAILED' ? 'failed' : 'pending');
+        const breakdown = Array.isArray(res.breakdown) ? res.breakdown : [];
+
+        resSec.innerHTML = `
+          <div class="card">
+            <div class="card-body text-center" style="padding:2.5rem 1.5rem;">
+              <div class="result-score-circle ${circleClass}">
+                <strong style="font-size:2.1rem;">${res.percentage}%</strong>
+                <span class="text-xs font-bold">${res.score} / ${res.totalMarks} Marks</span>
+              </div>
+              <h2 style="font-size:1.65rem;margin-bottom:0.35rem;">${esc(res.examTitle)} — Submission Complete</h2>
+              <div class="mb-3">${window.Helpers.renderStatusBadge(res.resultStatus)}</div>
+              <p class="text-muted text-sm mb-4">
+                Attempt #${res.attemptNumber} &bull; Passing Threshold: ${res.passingScore}% &bull; Time Taken: ${window.Helpers.formatTimer(res.durationSeconds)}
+              </p>
+              <div class="d-flex justify-center gap-3">
+                <a href="exams.html" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Back to Exams</a>
+                <a href="profile.html" class="btn btn-primary"><i class="fa-solid fa-chart-pie"></i> View My Academic Progress</a>
+              </div>
+            </div>
+
+            ${res.allowReview && breakdown.length > 0 ? `
+              <div class="card-body" style="border-top:1px solid var(--border-color);background:var(--bg-body);">
+                <h3 class="mb-3" style="font-size:1.15rem;"><i class="fa-solid fa-list-check text-primary"></i> Detailed Answer Review &amp; Explanations</h3>
+                ${breakdown.map(function(item, idx) {
+                  const bClass = item.status === 'CORRECT' ? 'badge-success' : (item.status === 'PARTIAL' ? 'badge-warning' : (item.status === 'PENDING_REVIEW' ? 'badge-info' : 'badge-danger'));
+                  return `
+                    <div class="card mb-3" style="padding:1.15rem;">
+                      <div class="d-flex justify-between align-center mb-2">
+                        <strong>Question ${idx + 1}: ${esc(item.text)}</strong>
+                        <span class="badge ${bClass}">${item.earned_points} / ${item.points} pts (${esc(item.status)})</span>
+                      </div>
+                      <div class="text-sm mb-1"><strong>Your Answer:</strong> <code>${esc(JSON.stringify(item.student_answer))}</code></div>
+                      <div class="text-sm text-success mb-1"><strong>Correct Answer:</strong> <code>${esc(JSON.stringify(item.correct_answer))}</code></div>
+                      ${item.explanation ? `<div class="text-xs text-secondary mt-2" style="background:var(--warning-light);padding:0.6rem 0.85rem;border-radius:8px;color:#92400e;"><i class="fa-solid fa-lightbulb"></i> <strong>Explanation:</strong> ${esc(item.explanation)}</div>` : ''}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
+
+      topSubmitBtn.addEventListener('click', confirmAndSubmitExam);
+      sideSubmitBtn.addEventListener('click', confirmAndSubmitExam);
+
+      initExamSession();
+    })();
+  </script>
+</body>
+</html>

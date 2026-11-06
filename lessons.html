@@ -1,0 +1,314 @@
+﻿<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lessons &amp; Study Materials — Lingo Student Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <link rel="stylesheet" href="assets/css/student.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body>
+  <!-- Student Navbar -->
+  <header class="student-navbar">
+    <div class="student-navbar-inner">
+      <a href="dashboard.html" class="student-brand">
+        <div class="student-brand-logo"><i class="fa-solid fa-graduation-cap"></i></div>
+        <span>Lingo Student</span>
+      </a>
+
+      <nav class="student-nav-links">
+        <a href="dashboard.html" class="student-nav-link"><i class="fa-solid fa-house"></i> <span data-i18n="Dashboard">Dashboard</span></a>
+        <a href="levels.html" class="student-nav-link"><i class="fa-solid fa-layer-group"></i> <span data-i18n="My Levels">My Levels</span></a>
+        <a href="lessons.html" class="student-nav-link active"><i class="fa-solid fa-book-open"></i> <span data-i18n="Lessons">Lessons</span></a>
+        <a href="exams.html" class="student-nav-link"><i class="fa-solid fa-file-signature"></i> <span data-i18n="Exams">Exams</span></a>
+        <a href="tasks.html" class="student-nav-link"><i class="fa-solid fa-list-check"></i> <span data-i18n="Tasks">Tasks</span></a>
+        <a href="profile.html" class="student-nav-link"><i class="fa-solid fa-chart-pie"></i> <span data-i18n="My Profile">My Progress</span></a>
+      </nav>
+
+      <div class="d-flex align-center gap-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-action="toggle-lang">
+          <i class="fa-solid fa-language"></i> <span data-lang-toggleLabel>عربي</span>
+        </button>
+        <div class="avatar avatar-sm" data-student-avatar>ST</div>
+        <button type="button" class="btn btn-outline-danger btn-sm" data-action="logout">
+          <i class="fa-solid fa-right-from-bracket"></i> <span data-i18n="Logout">Logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="student-container">
+    <!-- Top Level Filter Bar -->
+    <div class="d-flex justify-between align-center flex-wrap gap-3 mb-4">
+      <div>
+        <h1 style="font-size:1.5rem;" data-i18n="Lessons">Interactive Lessons &amp; Study Materials</h1>
+        <p class="text-muted text-sm">Study your assigned lessons, play attached audio/video materials, and track your completion progress.</p>
+      </div>
+      <div class="d-flex align-center gap-2">
+        <label class="text-sm font-bold" for="stu-lesson-level-select">Filter by Level:</label>
+        <select id="stu-lesson-level-select" class="form-select" style="width:auto;min-width:220px;">
+          <option value="">All My Assigned Levels</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Lesson Reader 2-Column Layout -->
+    <div class="lesson-reader-layout">
+      <!-- Left Sidebar: Lessons List -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title" style="font-size:0.95rem;"><i class="fa-solid fa-list-ul text-primary"></i> Curriculum Lessons</h3>
+        </div>
+        <div class="card-body" style="padding:0.85rem;">
+          <div id="student-lessons-sidebar" class="lesson-sidebar-list">
+            <div class="loading-state"><span class="spinner"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Main Content: Active Lesson Viewer -->
+      <div id="student-lesson-viewer">
+        <div class="card">
+          <div class="empty-state">
+            <div class="empty-state-icon"><i class="fa-solid fa-book-open-reader"></i></div>
+            <h3>Select a Lesson to Start Studying</h3>
+            <p>Choose a lesson from the curriculum list on the left to read its content, view media attachments, and complete associated tasks.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/helpers.js"></script>
+  <script>
+    (async function() {
+      const session = await window.Auth.requireStudent();
+      if (!session) return;
+
+      const esc = window.Helpers.escapeHtml;
+      let myLevels = [];
+      let myLessons = [];
+      let activeLessonId = window.Helpers.getQueryParam('lessonId') || '';
+      const initialLevelId = window.Helpers.getQueryParam('levelId') || '';
+
+      const levelSelect = document.getElementById('stu-lesson-level-select');
+      const sidebarEl = document.getElementById('student-lessons-sidebar');
+      const viewerEl = document.getElementById('student-lesson-viewer');
+
+      async function loadLessonsPage() {
+        try {
+          const res = await Promise.all([
+            window.API.getLevels(),
+            window.API.getLessons(initialLevelId ? { levelId: initialLevelId } : {})
+          ]);
+          myLevels = res[0] || [];
+          myLessons = res[1] || [];
+
+          levelSelect.innerHTML = `<option value="">All My Assigned Levels</option>` +
+            myLevels.map(function(l) {
+              return `<option value="${esc(l.Level_ID)}">${esc(l.Level_Name)}</option>`;
+            }).join('');
+
+          if (initialLevelId) {
+            levelSelect.value = initialLevelId;
+          }
+
+          renderSidebar();
+
+          if (activeLessonId) {
+            await openLesson(activeLessonId);
+          } else if (myLessons.length > 0) {
+            await openLesson(myLessons[0].Lesson_ID);
+          }
+        } catch (err) {
+          sidebarEl.innerHTML = `<p class="text-danger text-sm">${esc(err.message)}</p>`;
+        }
+      }
+
+      levelSelect.addEventListener('change', async function() {
+        try {
+          const lvl = levelSelect.value;
+          myLessons = await window.API.getLessons(lvl ? { levelId: lvl } : {});
+          renderSidebar();
+          if (myLessons.length > 0) {
+            await openLesson(myLessons[0].Lesson_ID);
+          } else {
+            viewerEl.innerHTML = `<div class="card"><div class="empty-state"><h3>No Lessons in Selected Level</h3></div></div>`;
+          }
+        } catch (err) {
+          window.Helpers.showToast(err.message, 'error');
+        }
+      });
+
+      function renderSidebar() {
+        if (myLessons.length === 0) {
+          sidebarEl.innerHTML = `<p class="text-muted text-sm text-center py-3">No lessons available.</p>`;
+          return;
+        }
+        sidebarEl.innerHTML = myLessons.map(function(les) {
+          const isActive = String(les.Lesson_ID) === String(activeLessonId);
+          return `
+            <div class="lesson-sidebar-item ${isActive ? 'active' : ''}" data-select-lesson="${esc(les.Lesson_ID)}">
+              <div>
+                <div class="text-xs text-muted">${esc(les.Level_Name)} &bull; #${les.Display_Order}</div>
+                <div>${esc(les.Lesson_Title)}</div>
+              </div>
+              ${les.Is_Completed
+                ? `<i class="fa-solid fa-circle-check text-success" title="Completed"></i>`
+                : `<i class="fa-regular fa-circle text-muted" title="In Progress"></i>`}
+            </div>
+          `;
+        }).join('');
+
+        sidebarEl.querySelectorAll('[data-select-lesson]').forEach(function(item) {
+          item.addEventListener('click', function() {
+            openLesson(item.getAttribute('data-select-lesson'));
+          });
+        });
+      }
+
+      async function openLesson(lessonId) {
+        activeLessonId = lessonId;
+        renderSidebar();
+        viewerEl.innerHTML = `<div class="card"><div class="loading-state"><span class="spinner"></span><p class="mt-2">Loading lesson content &amp; media...</p></div></div>`;
+
+        try {
+          const les = await window.API.getLessonById({ lessonId: lessonId });
+          const atts = Array.isArray(les.Attachments) ? les.Attachments : [];
+          const assocExams = Array.isArray(les.Associated_Exams) ? les.Associated_Exams : [];
+          const assocTasks = Array.isArray(les.Associated_Tasks) ? les.Associated_Tasks : [];
+
+          viewerEl.innerHTML = `
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <span class="badge badge-primary mb-1">${esc(les.Level_Name)} &bull; Lesson #${les.Display_Order}</span>
+                  <h2 style="font-size:1.35rem;">${esc(les.Lesson_Title)}</h2>
+                </div>
+                <button type="button" class="btn ${les.Is_Completed ? 'btn-success' : 'btn-outline-primary'}" id="mark-lesson-complete-btn">
+                  <i class="fa-solid ${les.Is_Completed ? 'fa-circle-check' : 'fa-check'}"></i>
+                  ${les.Is_Completed ? 'Completed' : 'Mark as Complete'}
+                </button>
+              </div>
+
+              <div class="card-body">
+                ${les.Image_URL ? `<img src="${esc(les.Image_URL)}" alt="${esc(les.Lesson_Title)}" style="max-height:320px;width:100%;object-fit:cover;border-radius:12px;margin-bottom:1.25rem;">` : ''}
+
+                ${les.Description ? `<div style="background:var(--primary-light);color:var(--primary);padding:0.9rem 1.15rem;border-radius:10px;margin-bottom:1.25rem;font-weight:500;">${esc(les.Description)}</div>` : ''}
+
+                <div class="lesson-content-prose" style="white-space:pre-wrap;padding:0.5rem 0;">${esc(les.Content || 'No text content provided for this lesson.')}</div>
+
+                <!-- Attached Media (Images, Audio, Video) -->
+                ${atts.length > 0 ? `
+                  <div class="mt-6 pt-4" style="border-top:1px solid var(--border-color);">
+                    <h3 style="font-size:1.05rem;margin-bottom:1rem;"><i class="fa-solid fa-photo-film text-primary"></i> Attached Lesson Media (${atts.length})</h3>
+                    <div class="d-flex flex-column gap-4">
+                      ${atts.map(function(att) {
+                        if (att.file_type === 'image') {
+                          return `<div class="card" style="padding:1rem;"><div class="text-sm font-bold mb-2"><i class="fa-solid fa-image text-primary"></i> ${esc(att.file_name)}</div><img src="${esc(att.url)}" alt="${esc(att.file_name)}" style="max-height:360px;border-radius:8px;"></div>`;
+                        }
+                        if (att.file_type === 'audio') {
+                          return `<div class="card" style="padding:1rem;"><div class="text-sm font-bold mb-2"><i class="fa-solid fa-volume-high text-success"></i> ${esc(att.file_name)}</div><audio controls src="${esc(att.url)}" class="w-100"></audio></div>`;
+                        }
+                        if (att.file_type === 'video') {
+                          return `<div class="card" style="padding:1rem;"><div class="text-sm font-bold mb-2"><i class="fa-solid fa-video text-warning"></i> ${esc(att.file_name)}</div><video controls src="${esc(att.url)}" style="max-height:380px;width:100%;border-radius:8px;"></video></div>`;
+                        }
+                        return `<a href="${esc(att.url)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">${esc(att.file_name)}</a>`;
+                      }).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+
+                <!-- Associated Tasks & Exams for this Lesson -->
+                ${(assocTasks.length > 0 || assocExams.length > 0) ? `
+                  <div class="mt-6 pt-4" style="border-top:1px solid var(--border-color);">
+                    <h3 style="font-size:1.05rem;margin-bottom:1rem;"><i class="fa-solid fa-list-check text-success"></i> Lesson Practice Tasks &amp; Assessments</h3>
+                    <div class="form-row">
+                      ${assocTasks.map(function(tk) {
+                        return `
+                          <div style="padding:1rem;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-body);display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                              <span class="badge badge-success mb-1">Task</span>
+                              <div class="font-bold">${esc(tk.Task_Title)}</div>
+                              <div class="text-xs text-muted">Max Score: ${tk.Max_Score}</div>
+                            </div>
+                            <a href="task-player.html?taskId=${encodeURIComponent(tk.Task_ID)}" class="btn btn-primary btn-sm">Open Task</a>
+                          </div>
+                        `;
+                      }).join('')}
+                      ${assocExams.map(function(ex) {
+                        return `
+                          <div style="padding:1rem;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-body);display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                              <span class="badge badge-warning mb-1">Exam</span>
+                              <div class="font-bold">${esc(ex.Exam_Title)}</div>
+                              <div class="text-xs text-muted">${ex.Duration} mins &bull; ${ex.Total_Marks} marks</div>
+                            </div>
+                            <a href="exam-player.html?examId=${encodeURIComponent(ex.Exam_ID)}" class="btn btn-primary btn-sm">Take Exam</a>
+                          </div>
+                        `;
+                      }).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+
+              <!-- Previous / Next Lesson Navigation Footer -->
+              <div class="card-footer">
+                <div>
+                  ${les.Previous_Lesson ? `
+                    <button type="button" class="btn btn-secondary btn-sm" data-nav-lesson="${esc(les.Previous_Lesson.Lesson_ID)}">
+                      <i class="fa-solid fa-arrow-left"></i> Prev: ${esc(les.Previous_Lesson.Lesson_Title)}
+                    </button>
+                  ` : ''}
+                </div>
+                <div>
+                  ${les.Next_Lesson ? `
+                    <button type="button" class="btn btn-primary btn-sm" data-nav-lesson="${esc(les.Next_Lesson.Lesson_ID)}">
+                      Next: ${esc(les.Next_Lesson.Lesson_Title)} <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+
+          viewerEl.querySelectorAll('[data-nav-lesson]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+              openLesson(btn.getAttribute('data-nav-lesson'));
+            });
+          });
+
+          const completeBtn = document.getElementById('mark-lesson-complete-btn');
+          if (completeBtn) {
+            completeBtn.addEventListener('click', async function() {
+              completeBtn.disabled = true;
+              try {
+                await window.API.markLessonComplete({ lessonId: les.Lesson_ID, durationSeconds: 120 });
+                window.Helpers.showToast('Lesson marked as completed!', 'success');
+                const found = myLessons.find(function(x) { return x.Lesson_ID === les.Lesson_ID; });
+                if (found) found.Is_Completed = true;
+                renderSidebar();
+                completeBtn.className = 'btn btn-success';
+                completeBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Completed';
+              } catch (err) {
+                window.Helpers.showToast(err.message, 'error');
+                completeBtn.disabled = false;
+              }
+            });
+          }
+        } catch (err) {
+          viewerEl.innerHTML = `<div class="card"><div class="empty-state"><p class="text-danger">${esc(err.message)}</p></div></div>`;
+        }
+      }
+
+      loadLessonsPage();
+    })();
+  </script>
+</body>
+</html>

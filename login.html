@@ -1,0 +1,126 @@
+﻿<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Portal Login — Lingo Learning Platform</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <link rel="stylesheet" href="assets/css/student.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="d-flex justify-between align-center mb-4">
+        <div class="d-flex align-center gap-2">
+          <div class="student-brand-logo" style="width:32px;height:32px;font-size:0.9rem;"><i class="fa-solid fa-graduation-cap"></i></div>
+          <span class="font-bold text-sm">Lingo Student</span>
+        </div>
+        <div class="d-flex align-center gap-2">
+          <div class="api-status-pill" title="Configure Google Apps Script Backend">
+            <span class="api-status-dot"></span>
+            <span class="api-status-label">Backend API</span>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" data-action="toggle-lang">
+            <i class="fa-solid fa-language"></i> <span data-lang-toggleLabel>عربي</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="auth-brand">
+        <div class="auth-brand-icon">
+          <i class="fa-solid fa-user-graduate"></i>
+        </div>
+        <h1 style="font-size:1.5rem;margin-bottom:0.3rem;">Student Portal Login</h1>
+        <p class="text-muted text-sm">Enter your unique Student Code and Password to access your assigned levels</p>
+      </div>
+
+      <div id="stu-login-error" class="d-none" style="background:var(--danger-light);color:#991b1b;padding:0.85rem 1rem;border-radius:var(--radius-md);font-size:0.875rem;margin-bottom:1.15rem;border:1px solid #fecaca;"></div>
+
+      <form id="student-login-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="student-code-input">Student Code <span class="required">*</span></label>
+          <input type="text" id="student-code-input" class="form-control" placeholder="e.g. STU-2026-1001" required autocomplete="username" style="font-family:monospace;font-weight:600;">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="student-password-input">Password <span class="required">*</span></label>
+          <div style="position:relative;display:flex;align-items:center;">
+            <input type="password" id="student-password-input" class="form-control" placeholder="Enter your password" required autocomplete="current-password" style="padding-inline-end:2.75rem;">
+            <button type="button" id="stu-toggle-pwd" class="btn btn-ghost btn-sm" style="position:absolute;inset-inline-end:0.35rem;" title="Show/Hide Password">
+              <i class="fa-regular fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" id="student-login-submit" class="btn btn-primary btn-lg w-100 mt-2">
+          <i class="fa-solid fa-right-to-bracket"></i> Sign In to My Portal
+        </button>
+      </form>
+
+      <div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border-color);display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:0.5rem;font-size:0.82rem;">
+        <button type="button" class="btn btn-ghost btn-sm text-primary" data-action="open-api-config">
+          <i class="fa-solid fa-plug-circle-bolt"></i> Configure Backend URL
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/helpers.js"></script>
+  <script>
+    (function() {
+      const existing = window.Auth.getStudentSession();
+      if (existing && existing.token) {
+        window.location.href = 'dashboard.html';
+        return;
+      }
+
+      const form = document.getElementById('student-login-form');
+      const codeInput = document.getElementById('student-code-input');
+      const pwdInput = document.getElementById('student-password-input');
+      const toggleBtn = document.getElementById('stu-toggle-pwd');
+      const submitBtn = document.getElementById('student-login-submit');
+      const errorBox = document.getElementById('stu-login-error');
+
+      toggleBtn.addEventListener('click', function() {
+        const isPwd = pwdInput.type === 'password';
+        pwdInput.type = isPwd ? 'text' : 'password';
+        toggleBtn.innerHTML = isPwd ? '<i class="fa-regular fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>';
+      });
+
+      form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        errorBox.classList.add('d-none');
+
+        const code = codeInput.value.trim();
+        const password = pwdInput.value;
+
+        if (!code || !password) {
+          errorBox.textContent = 'Please enter both your Student Code and Password.';
+          errorBox.classList.remove('d-none');
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner spinner-sm spinner-white"></span> Signing in...';
+
+        try {
+          await window.Auth.loginStudent(code, password);
+          window.Helpers.showToast('Welcome to your Learning Portal!', 'success');
+          window.location.href = 'dashboard.html';
+        } catch (err) {
+          errorBox.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> ' + window.Helpers.escapeHtml(err.message);
+          errorBox.classList.remove('d-none');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In to My Portal';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
